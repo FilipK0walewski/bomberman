@@ -68,6 +68,7 @@ class Enemy:
 
         self.set_movement(0, 0)
 
+    """
     def find_player(self, player_rect):
         if player_rect.x < self.enemy_rect.x:
             if player_rect.y < self.enemy_rect.y:
@@ -88,6 +89,7 @@ class Enemy:
                 self.set_movement(0, -1)
             if player_rect.y > self.enemy_rect.y:
                 self.set_movement(0, 2)
+    """
 
     def find_place_to_turn(self):
         temp_list = []

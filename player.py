@@ -1,5 +1,6 @@
 import random
 import pygame
+from bomberman.bomb import Bomb
 
 
 class Player:
@@ -30,6 +31,17 @@ class Player:
         self.animations = {}
 
         self.true_scroll = [0, 0]
+        self.on_bomb = False
+
+        self.bomb_number = 1
+        self.load_images()
+
+    def find_spawn_position(self, spawn):
+        r = spawn[random.randint(0, len(spawn))]
+        rx = r.x
+        ry = r.y
+        self.player_rect.x = rx
+        self.player_rect.y = ry
 
     def load_images(self):
 
@@ -63,7 +75,7 @@ class Player:
                 hit_list.append(tile)
         return hit_list
 
-    def move_player(self, map_rect):
+    def move_player(self, map_rect, bomb_rect):
         keys = pygame.key.get_pressed()
 
         if keys[pygame.K_LEFT]:
@@ -82,6 +94,8 @@ class Player:
             self.action = 'up'
         if self.player_movement == [0, 0]:
             self.action = 'idle'
+        if keys[pygame.K_SPACE]:
+            pass
 
         self.player_rect.x += self.player_movement[0]
         hit_list = self.collision_test(map_rect)
@@ -100,6 +114,8 @@ class Player:
                 self.player_rect.bottom = tile.top
             elif self.player_movement[1] < 0:
                 self.player_rect.top = tile.bottom
+
+        # self.bomb_collider(bomb_rect)
 
         self.player_movement_reset()
 
@@ -124,3 +140,32 @@ class Player:
 
     def get_player_hp(self):
         return self.player_hp
+
+    def bomb_collider(self, bomb_rect):
+
+        for tile in bomb_rect:
+            if self.on_bomb is True:
+                if self.player_rect.colliderect(tile):
+                    pass
+                else:
+                    self.on_bomb = False
+            else:
+                print("not on bomb")
+                if self.player_rect.colliderect(tile):
+                    if self.player_movement[0] > 0:
+                        self.player_rect.right = tile.left
+                    if self.player_movement[0] < 0:
+                        self.player_rect.left = tile.right
+                    if self.player_movement[1] > 0:
+                        self.player_rect.bottom = tile.top
+                    if self.player_movement[1] < 0:
+                        self.player_rect.top = tile.bottom
+
+    def add_bomb(self):
+        self.bomb_number += 1
+
+    def remove_bomb(self):
+        self.bomb_number -= 1
+
+    def get_bomb_number(self):
+        return self.bomb_number
