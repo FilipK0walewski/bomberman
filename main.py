@@ -1,22 +1,26 @@
-import pygame
-import sys
-from pygame import *
-from bomberman.player import Player
-from bomberman.map import Map
-from bomberman.bomb import Bomb
-from bomberman.enemy import Enemy
+from bomberman.game import Game
+
+g = Game()
+
+while g.get_running():
+
+    g.current_menu.display_menu()
+    g.game_loop()
+
+"""
+
 
 clock = pygame.time.Clock()
 pygame.init()
 
 pygame.display.set_caption("The Game")
-window_width = 800
-window_height = 600
+window_width = 1600
+window_height = 900
 
 windowSize = (window_width, window_height)
 
 surface = pygame.display.set_mode(windowSize, 0, 32)
-display = pygame.Surface((int(window_width), int(window_height)))
+display = pygame.Surface((int(window_width / 2), int(window_height / 2)))
 
 bombDropped = False
 bombExploded = False
@@ -33,7 +37,11 @@ levels = []
 bomb_rect = []
 x = 0
 
-font = pygame.font.SysFont(None, 20)
+score = 0
+time = 120000000
+lives = 1
+
+font = pygame.font.SysFont('comicsans', 20, True)
 click = False
 
 for n in range(2):
@@ -41,33 +49,34 @@ for n in range(2):
     levels.append(level)
 
 spawn = levels[x].get_spawn_rect()
-player_0 = Player(window_width, window_height, display, spawn)
+player_0 = Player(int(window_width / 2), int(window_height / 2), display, spawn)
 
 
 def reset():
     global door_spawned, enemies, bombs, spawn
     enemies = []
-    player_0.set_player_hp(100)
+    player_0.set_player_hearts(1)
     player_0.find_spawn_position(spawn)
 
     spawn = levels[x].get_spawn_rect()
 
     for m in range((x + 1) * 3):
         enemy = Enemy(spawn, display)
-        enemy.load_image()
         enemies.append(enemy)
 
     door_spawned = False
 
 
 def update_game():
-    global bombDropped, bombPause, door_spawned, running, x, explosion_length
+    global bombDropped, bombPause, door_spawned, running, x, explosion_length, time, score
 
     r = levels[x].get_tile_rect()
 
+    # player movement
     player_0.move_player(r,  bomb_rect)
     player_rect = player_0.get_player_rect()
 
+    # bomb dropping
     if bombDropped is True:
         current_tick = pygame.time.get_ticks()
         bombTicks.append(current_tick)
@@ -89,9 +98,11 @@ def update_game():
 
             for tile in er:
                 if tile.colliderect(player_0.get_player_rect()):
-                    player_0.set_player_hp(-100)
+                    player_0.hit()
+
                 for alien in enemies:
                     if tile.colliderect(alien.get_rect()):
+                        score += 10
                         alien.take_damage(200)
 
             if pygame.time.get_ticks() - t > 4000:
@@ -105,14 +116,25 @@ def update_game():
         alien.move_enemy(r, bomb_rect)
         alien_rect = alien.get_rect()
         if alien_rect.colliderect(player_0.get_player_rect()):
-            player_0.set_player_hp(-100)
-            reset()
+            player_0.hit()
         if alien.get_hp() <= 0:
             enemies.remove(alien)
 
+    # door
+    
+    
+    if levels[x].check_door() is True:
+        door_rect = levels[x].get_door_rect()
+        for bomb in bombs:
+            explosion_rect = bomb.get_explosion_rect()
+            for rect in explosion_rect:
+                if rect.colliderect(door_rect):
+                    for m in range((x + 1) * 3):
+                        enemy = Enemy(spawn, display)
+                        enemies.append(enemy)
+    
     if len(enemies) == 0 and levels[x].check_door() is False:
         levels[x].open_the_door()
-        print("player: ", player_rect.x, " ", player_rect.y)
         print("all dead")
 
     if levels[x].check_door() is True:
@@ -137,6 +159,17 @@ def update_game():
             explosion_length += 1
             levels[x].coin_picking(rect, 'explosion')
 
+    # time
+
+    tick = pygame.time.get_ticks()
+    time = time - tick
+    print(tick)
+
+    # misc
+
+    if player_0.get_heats_number() <= 0:
+        running = False
+
 
 def draw_game():
     display.fill((255, 192, 203))
@@ -155,26 +188,32 @@ def draw_game():
 
     player_0.draw_player(s)
 
+    # hud:
+    draw_text("score: " + str(score), font, (255, 255, 255), display, 20, 10)
+    draw_text("time: " + str(time), font, (255, 255, 255), display, int(window_width) / 4 - 30, 10)
+    draw_text("lives: " + str(lives), font, (255, 255, 255), display, int(window_width) / 2 - 75, 10)
+
 
 def quit_game():
     pygame.quit()
     sys.exit()
 
 
-def draw_text(text, font_, color_, sur, x, y):
+def draw_text(text, font_, color_, sur, x_, y):
     text_obj = font_.render(text, 1, color_)
     text_rect = text_obj.get_rect()
-    text_rect.topleft = (int(x), int(y))
+    text_rect.topleft = (int(x_), int(y))
     sur.blit(text_obj, text_rect)
 
 
 def game():
+
     reset()
+
     pygame.mouse.set_visible(False)
     global running, bombDropped
     running = True
     while running:
-
         update_game()
         draw_game()
 
@@ -198,59 +237,14 @@ def game():
         clock.tick(60)
 
 
-def main_menu():
-
-    global click
-    while True:
-        surface.fill((255, 192, 203))
-        draw_text('main menu', font, (255, 255, 255), surface, 20, 20)
-
-        mx, my = pygame.mouse.get_pos()
-
-        button_1 = pygame.Rect(int(window_width / 2 - 100), 100, 200, 50)
-        button_2 = pygame.Rect(int(window_width / 2 - 100), 200, 200, 50)
-        if button_1.collidepoint(mx, my):
-            if click:
-                game()
-                pygame.mouse.set_visible(True)
-        if button_2.collidepoint(mx, my):
-            if click:
-                options()
-        pygame.draw.rect(surface, (255, 0, 0), button_1)
-        pygame.draw.rect(surface, (255, 0, 0), button_2)
-
-        click = False
-        for e in pygame.event.get():
-            if e.type == QUIT:
-                quit_game()
-            if e.type == KEYDOWN:
-                if e.key == K_ESCAPE:
-                    quit_game()
-            if e.type == MOUSEBUTTONDOWN:
-                if e.button == 1:
-                    click = True
-
-        pygame.display.update()
-        clock.tick(60)
 
 
-def options():
-    pygame.mouse.set_visible(True)
-    running_options = True
-    while running_options:
-        surface.fill((255, 192, 203))
-        draw_text('options', font, (255, 255, 255), surface, window_width / 2 - 25, 20)
 
-        for e in pygame.event.get():
-            if e.type == QUIT:
-                quit_game()
-            if e.type == KEYDOWN:
-                if e.key == K_ESCAPE:
-                    running_options = False
 
-        pygame.display.update()
-        clock.tick(60)
+
+
 
 
 # START
 main_menu()
+"""

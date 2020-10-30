@@ -3,7 +3,7 @@ import pygame
 
 class Bomb:
 
-    def __init__(self, bomb_rect, display, hard_wall, explosion_lenth):
+    def __init__(self, bomb_rect, display, hard_wall, explosion_length):
         self.display = display
         self.bomb_rect = pygame.Rect(bomb_rect.x, bomb_rect.y, 32, 32)
         self.hard_wall = hard_wall
@@ -11,7 +11,7 @@ class Bomb:
         self.explosion_rect = []
         self.bomb = []
         self.explosion_frames = []
-        self.explosion_length = explosion_lenth
+        self.explosion_length = explosion_length
         self.frame = 0
         self.bomb_exploded = False
         self.load_images()
@@ -43,6 +43,9 @@ class Bomb:
                 self.display.blit(self.explosion_frames[self.frame], (tile.x - s[0], tile.y - s[1]))
             self.frame += 1
 
+            if self.frame == len(self.explosion_frames) - 1:
+                self.frame = 0
+
     def collision_test(self, hit_box):
         hit_list = []
 
@@ -70,22 +73,36 @@ class Bomb:
         temp_tuple = (self.bomb_rect.x, self.bomb_rect.y, 32, 32)
         self.explosion_rect.append(pygame.Rect(temp_tuple))
 
-        for n in range(self.explosion_length + 1):
-            self.explosion_rect.append(pygame.Rect(self.bomb_rect.x + (n * 32), self.bomb_rect.y, 32, 32))
-            self.explosion_rect.append(pygame.Rect(self.bomb_rect.x - (n * 32), self.bomb_rect.y, 32, 32))
-            self.explosion_rect.append(pygame.Rect(self.bomb_rect.x, self.bomb_rect.y + (n * 32), 32, 32))
-            self.explosion_rect.append(pygame.Rect(self.bomb_rect.x, self.bomb_rect.y - (n * 32), 32, 32))
+        temp_list = [False, False, False, False]
 
-        for wall in self.hard_wall:
-            for e_tile in self.explosion_rect:
-                if wall.colliderect(e_tile):
-                    self.explosion_rect.remove(e_tile)
+        for n in range(self.explosion_length + 1):
+            temp_dict = {(self.bomb_rect.x + (n * 32), self.bomb_rect.y, 32, 32): temp_list[0],
+                         (self.bomb_rect.x - (n * 32), self.bomb_rect.y, 32, 32): temp_list[1],
+                         (self.bomb_rect.x, self.bomb_rect.y + (n * 32), 32, 32): temp_list[2],
+                         (self.bomb_rect.x, self.bomb_rect.y - (n * 32), 32, 32): temp_list[3]}
+            x = 0
+            for m, o in temp_dict.items():
+                temp_rect = pygame.Rect(m)
+                wall_found = o
+                if wall_found is False:
+                    for wall in self.hard_wall:
+                        if wall.colliderect(temp_rect):
+                            temp_list[x] = True
+                            wall_found = True
+                            break
+                    if wall_found is False:
+                        self.explosion_rect.append(temp_rect)
+                x += 1
 
     def get_explosion_rect(self):
         return self.explosion_rect
 
     def bigger_explosion_length(self):
-        self.explosion_length =+ 1
+        self.explosion_length += 1
 
     def get_bomb_rect(self):
         return self.bomb_rect
+
+    def bomb_falling(self):
+        self.bomb_rect.y += 1
+        self.display.blit(self.bomb[0], (self.bomb_rect.x, self.bomb_rect.y))

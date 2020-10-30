@@ -4,15 +4,17 @@ import pygame
 
 class Enemy:
 
-    def __init__(self, spawn_rect, display, speed=1):
-        n = len(spawn_rect)
-        r = spawn_rect[random.randint(0, n)]
+    def __init__(self, spawn_rect, display, x_spawn=32, y_spawn=32, spawn_on_point=False):
+        if spawn_on_point is False:
+            n = len(spawn_rect)
+            r = spawn_rect[random.randint(0, n - 1)]
+        else:
+            r = pygame.Rect(x_spawn, y_spawn, 32, 32)
 
         self.spawn_rect = spawn_rect
         self.turn_rect = []
         self.display = display
         self.enemy_rect = pygame.Rect(r.x, r.y, 32, 32)
-        self.speed = speed
         self.movement = [0, 0]
         self.enemy_hp = 20
         self.enemy_img = 0
@@ -20,7 +22,6 @@ class Enemy:
         self.start = True
         self.direction = 'right'
 
-    def load_image(self):
         self.enemy_img = pygame.image.load('assets/sprites/enemy_0.png')
         self.find_place_to_turn()
 

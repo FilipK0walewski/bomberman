@@ -1,24 +1,27 @@
 import random
 import pygame
-from bomberman.bomb import Bomb
 
 
 class Player:
 
-    def __init__(self, wx, wy, display, spawn):
+    def __init__(self, wx, wy, spawn):
         self.player_size = 32
 
-        self.x = wx / 2 - self.player_size / 2
-        self.y = wy / 2 - self.player_size / 2
+        self.x = (wx / 2 - self.player_size / 2) / 2
+        self.y = (wy / 2 - self.player_size / 2) / 2
 
+        self.x_start = 32
+        self.y_start = 32
+
+        """
         r = spawn[random.randint(0, len(spawn))]
         rx = r.x
         ry = r.y
+        """
 
-        self.display = display
-        self.player_rect = pygame.Rect(rx, ry, 32, 32)
+        self.player_rect = pygame.Rect(self.x_start, self.y_start, 32, 32)
 
-        self.player_hp = int(100)
+        self.player_hearts = 3
         self.player_movement = [0, 0]
         self.player_size = 32
         self.player_speed = 2
@@ -36,13 +39,6 @@ class Player:
         self.bomb_number = 1
         self.load_images()
 
-    def find_spawn_position(self, spawn):
-        r = spawn[random.randint(0, len(spawn))]
-        rx = r.x
-        ry = r.y
-        self.player_rect.x = rx
-        self.player_rect.y = ry
-
     def load_images(self):
 
         for action in self.player_actions:
@@ -58,15 +54,15 @@ class Player:
 
             self.animations[action] = temp_list
 
-    def draw_player(self, s):
+    def draw_player(self, s, display):
         player_img = self.animations[self.action][self.frame]
         self.frame += 1
         if self.frame == len(self.animations[self.action]):
             self.frame = 0
 
-        self.display.blit(player_img, (self.player_rect.x - s[0], self.player_rect.y - s[1]))
-        self.display.blit(pygame.transform.flip(player_img, self.flip, False),
-                          (self.player_rect.x - s[0], self.player_rect.y - s[1]))
+        display.blit(player_img, (self.player_rect.x - s[0], self.player_rect.y - s[1]))
+        display.blit(pygame.transform.flip(player_img, self.flip, False),
+                     (self.player_rect.x - s[0], self.player_rect.y - s[1]))
 
     def collision_test(self, map_rect):
         hit_list = []
@@ -75,7 +71,7 @@ class Player:
                 hit_list.append(tile)
         return hit_list
 
-    def move_player(self, map_rect, bomb_rect):
+    def move_player(self, map_rect):
         keys = pygame.key.get_pressed()
 
         if keys[pygame.K_LEFT]:
@@ -135,12 +131,6 @@ class Player:
 
         return scroll
 
-    def set_player_hp(self, value):
-        self.player_hp += value
-
-    def get_player_hp(self):
-        return self.player_hp
-
     def bomb_collider(self, bomb_rect):
 
         for tile in bomb_rect:
@@ -169,3 +159,16 @@ class Player:
 
     def get_bomb_number(self):
         return self.bomb_number
+
+    def hit(self):
+        self.player_hearts -= 1
+
+    def set_player_hearts(self, number):
+        self.player_hearts = number
+
+    def get_heats_number(self):
+        return self.player_hearts
+
+    def player_position_reset(self):
+        self.player_rect.x = self.x_start
+        self.player_rect.y = self.y_start

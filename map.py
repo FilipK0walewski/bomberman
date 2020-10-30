@@ -4,8 +4,7 @@ import pygame
 
 class Map:
 
-    def __init__(self, display, level):
-        self.display = display
+    def __init__(self, level):
         self.door_spawned = False
         self.door_opened = False
         self.door_rect = pygame.Rect
@@ -37,32 +36,35 @@ class Map:
             img = pygame.image.load('assets/sprites/grass/grass_' + str(n) + '.png')
             self.grass.append(img)
 
-    def display_map(self, s):
+    def display_map(self, s, display):
 
-        n = int(0)
+        n = 0
         for layer in self.game_map:
-            m = int(0)
+            m = 0
             for tile in layer:
-                self.display.blit(self.grass[0], (m * self.tile_size - s[0], n * self.tile_size - s[1]))
+                display.blit(self.grass[0], (m * self.tile_size - s[0], n * self.tile_size - s[1]))
                 if tile == '1':
-                    self.display.blit(self.rock_img, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
+                    display.blit(self.rock_img, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
                 if tile == '2':
-                    self.display.blit(self.tree_img, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
+                    display.blit(self.tree_img, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
                 if tile == '3':
-                    self.display.blit(self.grass[0], (m * self.tile_size - s[0], n * self.tile_size - s[1]))
-                    self.display.blit(self.bomb_coin, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
+                    display.blit(self.grass[0], (m * self.tile_size - s[0], n * self.tile_size - s[1]))
+                    display.blit(self.bomb_coin, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
                 if tile == '4':
-                    self.display.blit(self.grass[0], (m * self.tile_size - s[0], n * self.tile_size - s[1]))
-                    self.display.blit(self.explosion_coin, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
+                    display.blit(self.grass[0], (m * self.tile_size - s[0], n * self.tile_size - s[1]))
+                    display.blit(self.explosion_coin, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
+                if tile == '9':
+                    display.blit(self.grass[1], (m * self.tile_size - s[0], n * self.tile_size - s[1]))
                 if tile == '5':
                     if self.door_opened is True:
-                        self.display.blit(self.door_img, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
+                        display.blit(self.door_img, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
                     else:
-                        self.display.blit(self.door_closed_img, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
+                        display.blit(self.door_closed_img, (m * self.tile_size - s[0], n * self.tile_size - s[1]))
 
                 if tile == '1' or tile == '2':
                     self.map_rect.append(pygame.Rect(m * self.tile_size,
                                                      n * self.tile_size, self.tile_size, self.tile_size))
+
                 m += 1
             n += 1
 
@@ -74,20 +76,24 @@ class Map:
 
         for row in data:
             self.game_map.append(list(row))
+        self.generate_map()
 
+    def generate_map(self):
         y = 0
         for layer in self.game_map:
             x = 0
             for tile in layer:
                 temp_tuple = (x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size)
-                if tile == '0':
+                if tile != '1' and tile != '9':
                     if random.randint(1, 3) == 1:
                         self.game_map[y][x] = '2'
                     else:
+                        self.game_map[y][x] = '0'
                         self.spawn_rect.append(pygame.Rect(temp_tuple))
+                if tile == '5':
+                    self.game_map[y][x] = '0'
                 if tile == '1':
                     self.hard_wall.append(pygame.Rect(temp_tuple))
-
                 x += 1
             y += 1
 
@@ -101,14 +107,14 @@ class Map:
                 if tile == '2':
                     for i in range(len(explosion_rect)):
                         if pygame.Rect(temp_tuple).colliderect(explosion_rect[i]):
-                            n = random.randint(1, 10)
+                            n = random.randint(1, 20)
                             if n == 1:
                                 self.game_map[y][x] = '3'
                                 self.bomb_coin_rect.append(temp_tuple)
                             elif n == 2:
                                 self.game_map[y][x] = '4'
                                 self.explosion_coin_rect.append(temp_tuple)
-                            elif n == 3:
+                            elif n != 3:
                                 if self.door_spawned is False:
                                     self.game_map[y][x] = '5'
                                     self.door_rect = pygame.Rect(temp_tuple)
@@ -135,13 +141,15 @@ class Map:
     def check_door(self):
         return self.door_opened
 
+    def are_door_spawned(self):
+        return self.door_spawned
+
     def open_the_door(self):
         self.door_opened = True
 
-    def reset(self):
-        self.spawn_rect = []
-        self.map_rect = []
-        self.game_map = []
+    def door_remove(self):
+        self.door_spawned = False
+        self.door_opened = False
 
     def get_hard_wall(self):
         return self.hard_wall
@@ -156,8 +164,7 @@ class Map:
         y = 0
         for layer in self.game_map:
             x = 0
-            for tile in layer:
-                print(tile)
+            for _ in layer:
                 temp_tuple = (x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size)
                 if temp_tuple == coin_rect:
                     self.game_map[y][x] = '0'
