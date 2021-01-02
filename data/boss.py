@@ -21,6 +21,7 @@ class Boss(pygame.sprite.Sprite):
         self.immune_to_dmg = False
         self.spin = False
         self.angle = 0
+        self.value = 0
 
         self.window_w = width / 2
         self.window_h = height / 2
@@ -46,40 +47,46 @@ class Boss(pygame.sprite.Sprite):
 
         self.acceleration.x = 0
         self.acceleration.y = 0
-        value = 0
 
         if self.max_health < self.health * 2:
+            self.value = 25
             tick = pygame.time.get_ticks()
             if tick - self.last_tick > 2000:
                 self.last_tick = tick
 
-                if self.position.x > player_rect.x:
-                    self.go_to_vector.x = player_rect.x - 100
+                if self.position.x > player_rect[0]:
+                    self.go_to_vector.x = player_rect[0] - 100
                 else:
-                    self.go_to_vector.x = player_rect.x + 100
+                    self.go_to_vector.x = player_rect[0] + 100
 
-                if self.position.y > player_rect.y:
-                    self.go_to_vector.y = player_rect.y - 100
+                if self.position.y > player_rect[1]:
+                    self.go_to_vector.y = player_rect[1] - 100
                 else:
-                    self.go_to_vector.y = player_rect.y + 100
+                    self.go_to_vector.y = player_rect[1] + 100
 
         elif self.max_health > self.health * 2 and self.mutated is False:
-            self.immune_to_dmg = True
-            self.go_to_vector.x = self.window_w / 2
-            self.go_to_vector.y = self.window_h / 2
-
             if 2 / 5 * self.window_w <= self.position.x <= 3 / 5 * self.window_w:
                 self.spin = True
+                self.go_to_vector.x = self.window_w * 3
+                self.value = 200
                 # self.mutated = True
-        elif self.max_health > self.health * 2 and self.mutated is True:
-            if self.position.x >= 2 * self.window_w:
-                self.position.x = -self.window_w
-                self.position.y = player_rect.y
-            self.go_to_vector.x = 3 * self.window_w
-            self.go_to_vector.y = player_rect.y
+            else:
+                self.immune_to_dmg = True
+                if self.spin is False:
+                    self.go_to_vector.x = self.window_w / 2
+                    self.go_to_vector.y = self.window_h / 2
 
-        self.acceleration.x += (self.go_to_vector.x - self.position.x) / 25
-        self.acceleration.y += (self.go_to_vector.y - self.position.y) / 25
+        elif self.max_health > self.health * 2 and self.mutated is True:
+            print(self.rect)
+            if self.position.x >= 2 * self.window_w:
+                self.go_to_vector.y = player_rect[1]
+                self.go_to_vector.x = -self.window_w * 2
+            elif self.position.x <= -self.window_w:
+                self.go_to_vector.y = player_rect[1]
+                self.go_to_vector.x = 3 * self.window_w
+
+        self.acceleration.x += (self.go_to_vector.x - self.position.x) / self.value
+        self.acceleration.y += (self.go_to_vector.y - self.position.y) / self.value
         # self.acceleration *= 2
 
         self.acceleration.x += self.velocity.x * self.friction
@@ -89,8 +96,8 @@ class Boss(pygame.sprite.Sprite):
         self.limit_velocity(2)
         self.position.x += self.velocity.x * dt + (self.acceleration.x * .5) * (dt * dt)
         self.position.y += self.velocity.y * dt + (self.acceleration.y * .5) * (dt * dt)
-        self.rect.x = self.position.x
-        self.rect.y = self.position.y
+        if self.spin is False:
+            self.rect.center = self.position
 
     def limit_velocity(self, max_vel):
         self.velocity.x = max(-max_vel, min(self.velocity.x, max_vel))

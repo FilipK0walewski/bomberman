@@ -327,7 +327,7 @@ class Game:
         directions = ['left', 'right', 'up', 'down']
 
         if self.boss is not None:
-            self.boss.update(self.levels[self.current_level].wall, self.player_0.rect, 1)
+            self.boss.update(self.levels[self.current_level].wall, self.player_0.rect.center, 1)
             if self.boss.shoot is True:
                 for i in directions:
                     pass

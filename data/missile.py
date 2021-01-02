@@ -52,4 +52,3 @@ class Missile:
             if self.angle == 0:
                 self.angle = 360
             self.angle -= 1
-
