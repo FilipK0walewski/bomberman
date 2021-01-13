@@ -17,6 +17,7 @@ class Menu:
         self.cross_img = pygame.image.load('data/assets/sprites/cross.png')
         self.cross_img = pygame.transform.scale(self.cross_img, (50, 70))
         self.first_start = True
+        self.clock = pygame.time.Clock()
 
     def screen_blit(self):
         self.game.window.blit(self.game.menu_display, (0, 0))
@@ -56,7 +57,7 @@ class GenerateMessage(Menu):
             self.game.check_events()
             self.game.menu_display.fill(self.game.black)
             self.menu_animation()
-            if self.game.player_0.player_hearts != 0:
+            if self.game.player_0.current_health != 0:
                 self.game.draw_text('LEVEL ' + str(self.game.current_level), 30, self.level_x, self.level_y, self.game.mustard)
             else:
                 self.game.draw_text('GAME OVER', 30, self.level_x, self.level_y, self.game.mustard)
@@ -107,6 +108,7 @@ class MainMenu(Menu):
             self.quit_rect = self.game.draw_text('QUIT GAME', 40, self.quit_x, self.quit_y, self.quit_color)
             self.check_input()
             self.screen_blit()
+            self.clock.tick(self.game.FPS)
 
     def check_input(self):
         if self.start_game_rect.collidepoint((int(self.mx), self.my)):

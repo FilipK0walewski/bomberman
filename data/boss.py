@@ -1,25 +1,31 @@
 import pygame
+from data.images import Spritesheet
+import math
 
 
 class Boss(pygame.sprite.Sprite):
-    def __init__(self,  x, y, width, height):
+    def __init__(self,  x, y, width, height, player_rect):
         pygame.sprite.Sprite.__init__(self)
 
+        sprite_sheet = Spritesheet('data/assets/sprites/enemy/boss.png')
+
         self.friction = -.12
-        self.img = pygame.image.load('data/assets/sprites/boss.png')
+        self.img = sprite_sheet.parse_sprite('boss_0')
         self.rect = self.img.get_rect()
+        self.in_cut_scene = True
+        self.defeated = False
 
         self.friction = -.25
-        self.position = pygame.math.Vector2(x / 2 - 32, y / 2)
+        self.position = pygame.math.Vector2(-x / 2, player_rect.y)
         self.velocity = pygame.math.Vector2(0, 0)
         self.acceleration = pygame.math.Vector2(0, 0)
-        self.go_to_vector = pygame.math.Vector2(0, 0)
+        self.go_to_pos = pygame.math.Vector2(0, 0)
 
         self.shoot = False
+        self.shoot_tick = 0
         self.last_tick = 0
-        self.mutated = False
-        self.immune_to_dmg = False
-        self.spin = False
+        self.damage_tick = 0
+
         self.angle = 0
         self.value = 0
 
@@ -31,62 +37,79 @@ class Boss(pygame.sprite.Sprite):
         self.health = width / 2
         self.ramka = pygame.Rect(20, self.window_h - 40, self.health - 40, 20)
 
+        self.animation = []
+        self.frame = 0
+        self.anim_tick = 0
+        self.miniature = pygame.image.load('data/assets/sprites/enemy/boss_miniature.png')
+
+        self.rotate_delay = 2500
+
+        for i in range(8):
+            temp = 'boss_' + str(i)
+            img = sprite_sheet.parse_sprite(temp)
+            self.animation.append(img)
+
     def draw_boss(self, scroll, display):
 
-        if self.spin is True:
-            display.blit(pygame.transform.rotate(self.img, self.angle), (self.rect.x - scroll.x, self.rect.y - scroll.y))
-            self.angle += 10
-            if self.angle == 1800:
-                self.angle = 0
-                self.spin = False
-                self.mutated = True
-        else:
-            display.blit(self.img, (self.rect.x - scroll.x, self.rect.y - scroll.y))
+        tick = pygame.time.get_ticks()
+        if tick - self.anim_tick > 25:
+            self.anim_tick = tick
+            self.frame = (self.frame + 1) % len(self.animation)
+
+        display.blit(pygame.transform.rotate(self.animation[self.frame], self.angle), (self.rect.x - scroll.x, self.rect.y - scroll.y))
+
+    def draw_health_bar(self, display):
+        health_bar = pygame.Rect(20, self.window_h - 40, self.health - 40, 20)
+        pygame.draw.rect(display, self.red, health_bar)
+        pygame.draw.rect(display, self.black, self.ramka, 2)
+        display.blit(self.miniature, (8, self.window_h - 45))
 
     def update(self, map_rect, player_rect, dt):
 
         self.acceleration.x = 0
         self.acceleration.y = 0
 
+        if self.in_cut_scene is True:
+            self.rotate_delay = 0
+        else:
+            pass
+            # self.rotate_delay = 2500
+
         if self.max_health < self.health * 2:
             self.value = 25
             tick = pygame.time.get_ticks()
-            if tick - self.last_tick > 2000:
+            if tick - self.last_tick > self.rotate_delay:
+                self.rotate_delay -= 100
                 self.last_tick = tick
 
-                if self.position.x > player_rect[0]:
-                    self.go_to_vector.x = player_rect[0] - 100
-                else:
-                    self.go_to_vector.x = player_rect[0] + 100
+                self.go_to_pos.x = player_rect[0]
+                self.go_to_pos.y = player_rect[1]
 
-                if self.position.y > player_rect[1]:
-                    self.go_to_vector.y = player_rect[1] - 100
-                else:
-                    self.go_to_vector.y = player_rect[1] + 100
+                delta = self.go_to_pos - self.position
 
-        elif self.max_health > self.health * 2 and self.mutated is False:
-            if 2 / 5 * self.window_w <= self.position.x <= 3 / 5 * self.window_w:
-                self.spin = True
-                self.go_to_vector.x = self.window_w * 3
-                self.value = 200
-                # self.mutated = True
-            else:
-                self.immune_to_dmg = True
-                if self.spin is False:
-                    self.go_to_vector.x = self.window_w / 2
-                    self.go_to_vector.y = self.window_h / 2
+                radians = math.atan2(-delta[1], delta[0])
+                self.angle = (radians * 180) / math.pi - 90
 
-        elif self.max_health > self.health * 2 and self.mutated is True:
-            print(self.rect)
+            if tick - self.shoot_tick > 500:
+                self.shoot_tick = tick
+                self.shoot = True
+
+        elif self.max_health > self.health * 2:
+            self.value = 50
             if self.position.x >= 2 * self.window_w:
-                self.go_to_vector.y = player_rect[1]
-                self.go_to_vector.x = -self.window_w * 2
+                self.go_to_pos.y = player_rect[1]
+                self.go_to_pos.x = -self.window_w * 2
+                self.angle = 90
             elif self.position.x <= -self.window_w:
-                self.go_to_vector.y = player_rect[1]
-                self.go_to_vector.x = 3 * self.window_w
+                self.go_to_pos.y = player_rect[1]
+                self.go_to_pos.x = 3 * self.window_w
+                self.angle = 270
 
-        self.acceleration.x += (self.go_to_vector.x - self.position.x) / self.value
-        self.acceleration.y += (self.go_to_vector.y - self.position.y) / self.value
+        if self.position != self.go_to_pos:
+            # self.acceleration.x += 50
+            # self.acceleration.y += 50
+            self.acceleration.x += (self.go_to_pos.x - self.position.x) / self.value
+            self.acceleration.y += (self.go_to_pos.y - self.position.y) / self.value
         # self.acceleration *= 2
 
         self.acceleration.x += self.velocity.x * self.friction
@@ -94,10 +117,10 @@ class Boss(pygame.sprite.Sprite):
         self.velocity.x += self.acceleration.x * dt
         self.velocity.y += self.acceleration.y * dt
         self.limit_velocity(2)
-        self.position.x += self.velocity.x * dt + (self.acceleration.x * .5) * (dt * dt)
-        self.position.y += self.velocity.y * dt + (self.acceleration.y * .5) * (dt * dt)
-        if self.spin is False:
-            self.rect.center = self.position
+        if self.in_cut_scene is False:
+            self.position.x += self.velocity.x * dt + (self.acceleration.x * .5) * (dt * dt)
+            self.position.y += self.velocity.y * dt + (self.acceleration.y * .5) * (dt * dt)
+        self.rect.center = self.position
 
     def limit_velocity(self, max_vel):
         self.velocity.x = max(-max_vel, min(self.velocity.x, max_vel))
@@ -106,8 +129,3 @@ class Boss(pygame.sprite.Sprite):
             self.velocity.x = 0
         if abs(self.velocity.y) < .01:
             self.velocity.y = 0
-
-    def draw_health_bar(self, display):
-        health_bar = pygame.Rect(20, self.window_h - 40, self.health - 40, 20)
-        pygame.draw.rect(display, self.red, health_bar)
-        pygame.draw.rect(display, self.black, self.ramka, 2)

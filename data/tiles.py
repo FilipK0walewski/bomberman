@@ -30,17 +30,19 @@ class TileMap:
         self.without_enemies = True
 
         self.floor = pygame.sprite.Group()
+        self.fog = []
         self.chest = []
         self.wall = pygame.sprite.Group()
         self.door = []
         self.coin = []
+        self.terminals = []
+        self.message = []
 
         self.map_h, self.map_w = 0, 0
         self.map = []
         self.read_csv(filename)
         self.load_tiles()
         self.map_surface = pygame.Surface((self.map_w, self.map_h))
-        self.map_surface.set_colorkey((0, 0, 0))
         self.load_map()
 
     def get_level_size(self):
@@ -69,12 +71,18 @@ class TileMap:
             for coin in self.coin:
                 if coin.rect == rect:
                     self.coin.remove(coin)
-        self.load_map()
+        self.load_floor()
 
     def get_door_rect(self):
         r = []
         for tile in self.door:
             r.append([tile.rect, tile.door_info, tile.collider])
+        return r
+
+    def get_terminal_rect(self):
+        r = []
+        for terminal in self.terminals:
+            r.append(terminal.rect)
         return r
 
     def get_hard_wall(self):
@@ -122,6 +130,10 @@ class TileMap:
         for tile in self.door:
             tile.draw(self.map_surface)
         self.wall.draw(self.map_surface)
+        for tile in self.terminals:
+            tile.draw(self.map_surface)
+        if len(self.message) != 0:
+            self.message[0].draw(self.map_surface)
 
     def load_doors(self):
         for tile in self.door:
@@ -131,6 +143,9 @@ class TileMap:
 
         for tile in self.door:
             tile.draw(self.map_surface)
+
+    def load_floor(self):
+        self.floor.draw(self.map_surface)
 
     def read_csv(self, filename):
         with open(os.path.join(filename)) as data:
@@ -203,12 +218,21 @@ class TileMap:
                     spawn_points += 1
                 elif tile == '33':
                     self.wall.add(Tile('floor_f', x * self.tile_size, y * self.tile_size, self.spritesheet))
+                    self.fog.append(pygame.Rect(x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size))
                 elif tile == '37':
                     self.floor.add(Tile('floor_0', x * self.tile_size, y * self.tile_size, self.spritesheet, 'floor'))
                     self.chest.append(Tile('chest', x * self.tile_size, y * self.tile_size, self.spritesheet))
                 elif tile == '38':
                     self.floor.add(Tile('floor_0', x * self.tile_size, y * self.tile_size, self.spritesheet, 'floor'))
                     self.wall.add(Tile('kolumn', x * self.tile_size, y * self.tile_size, self.spritesheet))
+                elif tile == 't':
+                    self.wall.add(Tile('wall_1', x * self.tile_size, y * self.tile_size, self.spritesheet))
+                    self.terminals.append(Tile('terminal', x * self.tile_size, y * self.tile_size, self.spritesheet))
+                elif tile == 'm':
+                    self.floor.add(Tile('floor_0', x * self.tile_size, y * self.tile_size, self.spritesheet, 'floor'))
+                    self.message.append(Tile('message', x * self.tile_size, y * self.tile_size, self.spritesheet))
+                else:
+                    self.floor.add(Tile('background', x * self.tile_size, y * self.tile_size, self.spritesheet, 'floor'))
 
                 x += 1
             y += 1

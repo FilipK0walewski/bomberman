@@ -1,54 +1,70 @@
 import pygame
+import math
+
+
+class PlayerMissile:
+    def __init__(self, pos, direction):
+        self.rect = pygame.Rect(pos[0], pos[1], 8, 8)
+        self.direction = direction
+
+        self.img = pygame.image.load('data/assets/sprites/missile.png')
+        self.speed = 5
+
+    def update(self):
+
+        if self.direction == 'right':
+            self.rect.x += 1 * self.speed
+        elif self.direction == 'left':
+            self.rect.x -= 1 * self.speed
+        elif self.direction == 'down':
+            self.rect.y += 1 * self.speed
+        elif self.direction == 'up':
+            self.rect.y -= 1 * self.speed
+        else:
+            self.rect.y += 1 * self.speed
+
+    def draw(self, s, display):
+        display.blit(self.img, (self.rect.x - s[0], self.rect.y - s[1]))
 
 
 class Missile:
-    def __init__(self, x, y, direction, flip, type):
-        self.x = x
-        self.y = y
-        self.direction = direction
-        self.flip = flip
+
+    def __init__(self, pos, vector, type, angle=0):
+
         self.type = type
-        self.missile_rect = pygame.Rect(x, y, 8, 8)
+        self.rect = pygame.Rect(pos[0], pos[1], 8, 8)
         self.health = 1000
 
-        self.missile_img = pygame.image.load('data/assets/sprites/missile.png')
+        self.img = pygame.image.load('data/assets/sprites/missile.png')
         self.axe_img = pygame.image.load('data/assets/sprites/axe.png')
-        self.angle = 360
+
+        delta_x = vector[0] - pos[0]
+        delta_y = vector[1] - pos[1]
+        self.angle = math.atan2(delta_y, delta_x)
+
+        # self.angle = angle * math.pi / 180
 
         self.speed = 0
         if self.type == 'axe':
             self.speed = 10
         elif self.type == 'bullet':
-            self.speed = 10
+            self.speed = 3
 
-    def move_missile(self):
+    def update(self):
 
-        if self.direction == 0:
-            self.direction = 'down'
-        elif self.direction == 1:
-            self.direction = "up"
-        elif self.direction == 2:
-            if self.flip is True:
-                self.direction = 'left'
-            else:
-                self.direction = 'right'
+        x_move = self.speed * math.cos(self.angle)
+        y_move = self.speed * math.sin(self.angle)
 
-        if self.direction == 'right':
-            self.missile_rect.x += self.speed
-        elif self.direction == 'left':
-            self.missile_rect.x -= self.speed
-        elif self.direction == 'up':
-            self.missile_rect.y -= self.speed
-        elif self.direction == 'down' or self.direction == 'idle':
-            self.missile_rect.y += self.speed
+        self.rect.x += x_move
+        self.rect.y += y_move
 
-    def draw_missile(self, s, display):
+    def draw(self, s, display):
         if self.type == 'bullet':
-            display.blit(self.missile_img, (self.missile_rect.x - s[0], self.missile_rect.y - s[1]))
+            display.blit(self.img, (self.rect.x - s[0], self.rect.y - s[1]))
         elif self.type == 'axe':
 
             img = pygame.transform.rotate(self.axe_img, self.angle)
-            display.blit(img, (self.missile_rect.x - s[0], self.missile_rect.y - s[1]))
+            display.blit(img, (self.rect.x - s[0], self.rect.y - s[1]))
             if self.angle == 0:
                 self.angle = 360
             self.angle -= 1

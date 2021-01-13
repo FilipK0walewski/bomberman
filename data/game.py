@@ -2,12 +2,15 @@ from data.menu import *
 from data.player import Player
 from data.bomb import Bomb
 from data.enemy import Enemy
-from data.images import Spritesheet
+# from data.images import Spritesheet
 # from data.npc import Npc
-from data.missile import Missile
+from data.missile import *
 from data.tiles import *
 from data.camera import *
 from data.boss import Boss
+from data.terminal import Terminal
+from data.cutscene import CutSceneMenager, BossSmallTalk
+from data.equipment import *
 
 
 class Game:
@@ -28,7 +31,7 @@ class Game:
         self.shoot = False
         self.kill_all_enemies = False
         self.enter_the_door = False
-        self.talk = False
+        self.use_key = False
 
         # screen
         self.window_width = 1280
@@ -51,9 +54,8 @@ class Game:
         self.magenta = (255, 0, 144)
 
         # images !!!
-        self.heart_img = pygame.image.load('data/assets/sprites/heart.png')
 
-        map_sheet = Spritesheet('data/assets/sprites/walls/tileset.png')
+        self.map_sheet = Spritesheet('data/assets/sprites/walls/tileset.png')
         self.spritesheet = Spritesheet('data/assets/sprites/spritesheet.png')
         bug_animation_sheet = Spritesheet('data/assets/sprites/enemy/bug.png')
         death_animation_sheet = Spritesheet('data/assets/sprites/destruction/destruction.png')
@@ -91,8 +93,10 @@ class Game:
 
         for i in range(self.number_of_levels):
             path = 'data/assets/maps/level_' + str(i) + '.csv'
-            level = TileMap(path, map_sheet, i)
+            level = TileMap(path, self.map_sheet, i)
             self.levels.append(level)
+
+        self.new_level_1 = TileMap('data/assets/maps/new_level_1.csv', self.map_sheet, 1)
 
         # menus
         self.main_menu = MainMenu(self)
@@ -103,10 +107,9 @@ class Game:
         self.current_menu = self.main_menu
 
         # player
-        self.player_0 = Player()
+        self.player_0 = Player((self.window_width, self.window_height))
 
         self.score = 0
-        self.time = 120
         self.temp_countdown = 1000
         self.dead_tick = 0
 
@@ -116,6 +119,10 @@ class Game:
         self.border = Border(self.camera, self.player_0)
         self.auto = Auto(self.camera, self.player_0)
         self.camera.set_method(self.follow)
+
+        # icon ???
+        icon = pygame.image.load('data/assets/sprites/cross.png')
+        pygame.display.set_icon(icon)
 
         # NPCs
         # self.npc_0 = Npc(self.levels[0].get_spawn_rect(), self)
@@ -131,14 +138,33 @@ class Game:
 
         # missiles
         self.missiles = []
-        self.direction = 'idle'
+        self.enemy_missiles = []
 
         # enemies
         self.enemies = []
         self.boss = None
+        self.bosses = []
 
         # temp
         self.temp_variable = True
+
+        # terminal
+        self.terminal = Terminal(self.window_width, self.window_height)
+
+        # cut scenes
+        self.cut_scene_menager = CutSceneMenager(self.display, (self.window_width, self.window_height), self.font_name, self.mustard, self.background)
+
+        # equipment
+        self.backpack = Equipment((self.window_width, self.window_height), self.font_name, self.player_0)
+        self.loot = []
+        self.chests = []
+
+        self.chests.append(Chest((256, 256), 0, self.player_0, (self.window_width, self.window_height)))
+
+        for i in range(64):
+            self.chests[0].add_item(Loot((0, 0), 0, 'lesser_health_potion'))
+
+        self.chests[0].add_item(Loot((256, 256), 0, 'message', 'password: PASSWORD14'))
 
     def game_loop(self):
         while self.playing:
@@ -146,51 +172,119 @@ class Game:
 
             self.update_game()
             self.draw_game()
+            # fps on screen
 
-            # surface.blit(pygame.transform.scale(display, windowSize), (0, 0))
+            self.draw_text(str(round(self.clock.get_fps(), 2)), 16, 0, self.window_height / 2, self.mustard, 'game', 'bottomleft')
+
             self.window.blit(pygame.transform.scale(self.display, (self.window_width, self.window_height)), (0, 0))
-            pygame.display.update()
+            pygame.display.flip()
             self.clock.tick(self.FPS)
             self.reset_keys()
 
     def update_game(self):
+
+        # map
+
+        level = self.levels[self.current_level]
+        map_rect = level.get_colliders()
+
+        if len(self.enemies) == 0 and self.levels[self.current_level].map_completed is False:
+
+            self.levels[self.current_level].map_completed = True
+            self.levels[self.current_level].load_doors()
+
+        if self.boss is not None:
+            self.cut_scene_menager.start_cut_scene(BossSmallTalk(self.player_0, self.boss))
+
         # pause
         if self.back_key is True:
             self.current_menu = self.pause_menu
             self.playing = False
 
-        # map
-        map_rect = self.levels[self.current_level].get_colliders()
-        # self.map_rect.append(self.npc_0.npc_rect)
-
-        if len(self.enemies) == 0 and self.levels[self.current_level].map_completed is False:
-            self.levels[self.current_level].map_completed = True
-            self.levels[self.current_level].load_doors()
-
         # player
-        self.player_0.move_player(map_rect, 1)
+        ################################################################################################################
+
+        self.player_0.busy = False
+
+        if self.backpack.visible:
+            self.player_0.busy = True
+        else:
+            self.backpack.selected = self.backpack.item_slots + 1
+
+        if self.cut_scene_menager.cut_scene is not None:
+            self.cut_scene_menager.update()
+
+        if len(level.fog) != 0:
+            for tile in level.fog:
+                if abs(tile.center[0] - self.player_0.rect.center[0]) < 32:
+                    self.player_0.talk = True
+                else:
+                    self.player_0.talk_pos = [self.player_0.rect.center[0] - self.camera.offset[0], self.player_0.rect.y - self.camera.offset[1] - 16]
+                    self.player_0.talk = False
+
+        terminals = self.levels[self.current_level].get_terminal_rect()
+
+        if len(terminals) != 0:
+            for terminal in terminals:
+                temp_rect = pygame.Rect(terminal.x, terminal.y + 32, 32, 32)
+
+                if temp_rect.colliderect(self.player_0.rect) and self.use_key is True:
+                    temp = self.terminal.use
+                    self.terminal.use = not temp
+
+        if self.terminal.use is True:
+            self.player_0.busy = True
+
+        # loot
+
+        if len(self.loot) != 0:
+            for item in self.loot:
+                if item.rect.colliderect(self.player_0.rect):
+                    if self.use_key is True:
+                        if self.backpack.empty_slots_number() != 0:
+                            self.backpack.add_item(item)
+                            self.loot.remove(item)
+                            break
+                        else:
+                            print('backpack full')
+
+        # chests
+
+        for chest in self.chests:
+            if chest.opened is True:
+                self.player_0.busy = True
+            if chest.rect.colliderect(self.player_0.rect):
+                if self.use_key is True:
+                    temp = chest.opened
+                    chest.opened = not temp
+
+        ################################################################################################################
+        # camera
+
         self.camera.scroll()
 
         # missiles
 
-        if self.shoot is True:
-            missile = Missile(self.player_0.rect.x, self.player_0.rect.y, self.player_0.action, True, 'bullet')
+        if self.shoot is True and self.player_0.busy is False:
+
+            direction = self.player_0.direction
+            missile = PlayerMissile(self.player_0.rect.topright, direction)
             self.missiles.append(missile)
 
         if len(self.missiles) != 0:
             for missile in self.missiles:
                 for tile in map_rect:
-                    if missile.missile_rect.colliderect(tile):
+                    if missile.rect.colliderect(tile):
                         self.missiles.remove(missile)
                         break
 
                 for enemy in self.enemies:
-                    if missile.missile_rect.colliderect(enemy.enemy_rect):
+                    if missile.rect.colliderect(enemy.enemy_rect):
                         enemy.take_damage(2)
                         self.missiles.remove(missile)
                         break
 
-                missile.move_missile()
+                missile.update()
 
         # bomb
         if self.bomb_dropped is True:
@@ -216,7 +310,7 @@ class Game:
         temp = 0
         for missile in self.missiles:
             for bomb in self.bombs:
-                if missile.missile_rect.colliderect(bomb.bomb_rect):
+                if missile.rect.colliderect(bomb.bomb_rect):
                     temp = pygame.time.get_ticks() - self.bomb_ticks[x]
                     temp = 3000 - temp
                     self.bomb_ticks[x] -= temp
@@ -243,7 +337,7 @@ class Game:
 
                 for tile in explosion_rect:
                     if tile.colliderect(self.player_0.rect):
-                        self.player_0.player_hearts -= 1
+                        self.player_0.take_damage(10)
                 if t is False:
                     t = temp
                 if pygame.time.get_ticks() - t >= 3800:
@@ -260,8 +354,7 @@ class Game:
                 enemy.move_enemy(map_rect, self.bomb_rect)
             enemy_rect = enemy.enemy_rect
             if enemy_rect.colliderect(self.player_0.rect):
-                self.player_0.player_hearts -= 1
-                print("enemy hit")
+                self.player_0.take_damage(10)
                 # self.game_over()
             if enemy.to_remove is True:
                 self.enemies.remove(enemy)
@@ -278,8 +371,9 @@ class Game:
             if self.player_0.rect.colliderect(temp):
 
                 if self.enter_the_door is True:
+                    # self.fade()
+
                     if rect[1][2] != 'i' and self.levels[self.current_level].map_completed is True:
-                        print("outside")
                         temp = rect[1][1]
                         temp = int(temp)
                         if temp == self.current_level:
@@ -289,10 +383,8 @@ class Game:
 
                     else:
                         temp = rect[1][1]
-                        print("inside")
                         for door in doors:
                             if door[1][1] == temp and door[0] != rect[0]:
-                                print(rect[0], " ", door[0])
                                 self.player_0.position.x = door[0].x
                                 self.player_0.position.y = door[0].y + 32
                                 break
@@ -302,6 +394,7 @@ class Game:
         coins = self.levels[self.current_level].coin
         for coin in coins:
             if self.player_0.rect.colliderect(coin.rect):
+                self.backpack.coins += 1
                 self.player_0.coins += 1
                 self.levels[self.current_level].picking(coin.rect, 'coin')
 
@@ -310,52 +403,65 @@ class Game:
             self.enemies.clear()
 
         # npc-player
-        """
-        in_range = False
-        for tile in self.npc_0.talk_rect:
-            if self.player_0.get_player_rect().colliderect(tile):
-                self.talk_to_npc = True
-                in_range = True
-        
-        if in_range is False:
-            self.talk = False
-
-        pygame.mouse.set_visible(self.talk)
-        """
 
         # boss
-        directions = ['left', 'right', 'up', 'down']
 
-        if self.boss is not None:
+        if self.current_level == 4:
+            x, y = self.levels[self.current_level].get_level_size()
+            self.boss = Boss(x, y, self.window_width, self.window_height, self.player_0.rect)
+
+        if self.boss is not None and self.boss.defeated is False:
+
             self.boss.update(self.levels[self.current_level].wall, self.player_0.rect.center, 1)
-            if self.boss.shoot is True:
-                for i in directions:
-                    pass
-                    # missile = Missile(self.boss.x, self.boss.y, i, False, 'bullet')
-                    # self.missiles.append(missile)
+            if self.boss.shoot is True and self.boss.in_cut_scene is False:
+                for i in range(10):
+                    temp = Missile(self.boss.rect.center, self.player_0.rect.center, 'bullet')
+                    self.enemy_missiles.append(temp)
+                self.boss.shoot = False
 
-            for missile in self.missiles:
-                if self.boss.rect.colliderect(missile.missile_rect):
-                    self.boss.health -= 1
-                    self.missiles.remove(missile)
+            for missile in self.enemy_missiles:
+
+                for tile in map_rect:
+                    if missile.rect.colliderect(tile):
+                        self.enemy_missiles.remove(missile)
+                        break
+
+                    if missile.rect.colliderect(self.player_0.rect):
+                        self.enemy_missiles.remove(missile)
+                        break
+
+                missile.update()
 
             x = 0
             for bomb in self.bombs:
-                if self.boss.rect.colliderect(bomb.bomb_rect):
+                if self.boss.rect.colliderect(bomb.bomb_rect) and pygame.time.get_ticks() - 1000 > self.boss.damage_tick:
+                    self.boss.damage_tick = pygame.time.get_ticks()
                     temp = pygame.time.get_ticks() - self.bomb_ticks[x]
                     temp = 3000 - temp
                     self.bomb_ticks[x] -= temp
-                    if self.boss.immune_to_dmg is False:
-                        self.boss.health -= 10
+                    self.boss.health -= 50
                 x += 1
 
-        # other
-        if self.player_0.player_hearts > 0:
-            self.dead_tick = pygame.time.get_ticks()
+        # eq
 
-        if pygame.time.get_ticks() - self.dead_tick >= 2000 and self.player_0.player_hearts <= 0:
-            pass
-            # self.game_over()
+        self.backpack.update()
+        for item in self.loot:
+            item.update(self.current_level)
+
+        for chest in self.chests:
+            chest.update(self.current_level, self.backpack)
+
+        # terminal
+
+        if self.terminal.use is True:
+            self.terminal.update_terminal()
+            if self.terminal.fans is True:
+                self.levels[1] = self.new_level_1
+
+        ################################################################################################################
+        # player update
+
+        self.player_0.update(map_rect, 1, self.cut_scene_menager)
 
     def draw_game(self):
 
@@ -363,45 +469,55 @@ class Game:
 
         self.levels[self.current_level].draw_map(self.camera.offset, self.display)
 
-        for bomb in self.bombs:
-            bomb.draw_bomb(self.camera.offset, self.display, self.bomb_animation)
-            bomb.draw_explosion(self.camera.offset, self.display)
+        # eq
+
+        for item in self.loot:
+            item.draw(self.display, self.camera.offset)
+
+        for chest in self.chests:
+            chest.draw(self.display, self.camera.offset, self.font_name)
+
+        # bombs
+
+        if len(self.bombs) != 0:
+            for bomb in self.bombs:
+                bomb.draw_bomb(self.camera.offset, self.display, self.bomb_animation)
+                bomb.draw_explosion(self.camera.offset, self.display)
 
         for enemy in self.enemies:
             enemy.draw_enemy(self.camera.offset, self.display)
 
         for missile in self.missiles:
-            missile.draw_missile(self.camera.offset, self.display)
+            missile.draw(self.camera.offset, self.display)
 
-        self.player_0.draw_player(self.camera.offset, self.display)
+        for missile in self.enemy_missiles:
+            missile.draw(self.camera.offset, self.display)
+
+        self.player_0.draw(self.camera.offset, self.display, self.font_name)
+
+        if self.player_0.talk is True:
+            self.draw_speech(random.choice(self.player_0.quotes), self.player_0.talk_pos)
 
         # boss
 
-        if self.boss is not None:
+        if self.boss is not None and self.boss.defeated is False:
             self.boss.draw_boss(self.camera.offset, self.display)
             self.boss.draw_health_bar(self.display)
 
-        """
-        if self.current_level == 0:
-            self.npc_0.draw_npc(self.scroll, self.display)
-            if self.talk is True:
-                self.npc_0.draw_chat(self.display)
-        """
-        # HUD
-        self.draw_text('SCORE: ' + str(self.score), 10, 75, 25, self.mustard, 'game')
-        self.draw_text('TIME: ' + str(self.time), 10, self.window_width / 4, 25, self.mustard, 'game')
-        temp_rect = self.draw_text('LIVES: ', 10, self.window_width / 2 - 125, 25, self.mustard, 'game')
-        x, y = temp_rect.topright
-        for n in range(self.player_0.bomb_number):
-            temp_rect = pygame.Rect(x + (n * 32), y - 10, 32, 32)
-            self.display.blit(self.heart_img, (temp_rect.x, temp_rect.y))
+        # terminal
+
+        if self.terminal.use is True:
+            self.terminal.draw_terminal(self.display)
+
+        # backpack
+
+        self.backpack.draw(self.display)
+
+        # cut scenes
+
+        self.cut_scene_menager.draw()
 
     def enter_the_door_function(self, spawn):
-
-        # boss
-        if self.current_level == 4:
-            x, y = self.levels[self.current_level].get_level_size()
-            self.boss = Boss(x, y, self.window_width, self.window_height)
 
         for rect in self.levels[self.current_level].get_door_rect():
             if int(rect[1][1]) == spawn:
@@ -412,7 +528,6 @@ class Game:
                 else:
                     self.player_0.position.y += 16
 
-        self.time = 120
         self.bomb_pause = True
         self.temp_variable = True
 
@@ -431,12 +546,8 @@ class Game:
                 enemy = Enemy(self.levels[self.current_level].get_spawn_rect(), self.bug_animation, self.death_animation)
                 self.enemies.append(enemy)
 
-        self.playing = False
-        self.current_menu = self.message_screen
-    
     def game_over(self):
 
-        self.time = 120
         self.bomb_pause = True
         self.temp_variable = True
         self.current_level = 0
@@ -469,46 +580,116 @@ class Game:
     def get_current_level(self):
         return self.current_level
 
+    def draw_speech(self, text, pos):
+
+        font = pygame.font.Font(self.font_name, 16)
+        text_surface = font.render(text, True, self.background)
+        text_rect = text_surface.get_rect(midbottom=pos)
+
+        # background
+        bg_rect = text_rect.inflate(16, 16)
+        bg_rect.bottom = pos[1] - 16
+        text_rect.center = bg_rect.center
+
+        pygame.draw.polygon(self.display, self.mustard, (pos, (pos[0] + 16, pos[1] - 16), (pos[0] - 16, pos[1] - 16)))
+        pygame.draw.rect(self.display, self.mustard, bg_rect, border_radius=15)
+        self.display.blit(text_surface, text_rect)
+
     def check_events(self):
+
         if self.playing is True:
             pygame.mouse.set_visible(False)
+
         if self.playing is False:
             pygame.mouse.set_visible(True)
+
         for event in pygame.event.get():
+
             if event.type == pygame.QUIT:
                 self.running = False
                 self.playing = False
                 self.current_menu.run_display = False
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.click = True
+
             if event.type == pygame.KEYDOWN:
+
+                # terminal
+
+                if self.terminal.use is True:
+                    self.terminal.input = event.key
+                    keys = pygame.key.get_pressed()
+                    if keys[pygame.K_c] and keys[pygame.K_LCTRL]:
+                        print('ctrl + c')
+                        self.terminal.python = False
+                        self.terminal.start_line = 'ROOT:~$ '
+                        self.terminal.input = 13
+
+                # eq
+
+                if event.key == pygame.K_TAB:
+                    temp = self.backpack.visible
+                    self.backpack.visible = not temp
+
+                # game
+
                 if event.key == pygame.K_q:
                     if self.bomb_pause is False and self.player_0.bomb_number != 0:
                         self.player_0.bomb_number -= 1
                         self.bomb_dropped = True
                     self.drop_bomb = True
+
                 if event.key == pygame.K_u:
                     self.kill_all_enemies = True
+
                 if event.key == pygame.K_RETURN:
+                    for chest in self.chests:
+                        if chest.opened is True:
+                            chest.move = True
+                    if self.backpack.visible is True:
+                        self.backpack.use = True
                     self.enter_the_door = True
-                if event.key == pygame.K_e:
-                    if self.talk_to_npc is True:
-                        self.talk = not self.talk
+
+                if event.key == pygame.K_e and self.terminal.use is False:
+                    if self.use_key is False:
+                        self.use_key = True
+
                 if event.key == pygame.K_SPACE:
                     self.shoot = True
-                if event.key == pygame.K_ESCAPE:
-                    self.back_key = True
 
-                # player move
+                if event.key == pygame.K_ESCAPE:
+                    if self.terminal.use is True:
+                        self.terminal.use = False
+                    else:
+                        self.back_key = True
+
+                # arrows
+
                 if event.key == pygame.K_RIGHT:
+                    for chest in self.chests:
+                        if chest.opened is True:
+                            chest.selected += 1
+                    if self.backpack.visible is True:
+                        self.backpack.selected += 1
                     self.player_0.right_key = True
                 if event.key == pygame.K_LEFT:
+                    for chest in self.chests:
+                        if chest.opened is True:
+                            chest.selected -= 1
+                    if self.backpack.visible is True:
+                        self.backpack.selected -= 1
                     self.player_0.left_key = True
                 if event.key == pygame.K_UP:
+                    if self.backpack.visible is True:
+                        self.backpack.menu_position -= 1
                     self.player_0.up_key = True
                 if event.key == pygame.K_DOWN:
+                    if self.backpack.visible is True:
+                        self.backpack.menu_position += 1
                     self.player_0.down_key = True
+
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_RIGHT:
                     self.player_0.right_key = False
@@ -526,15 +707,21 @@ class Game:
         self.shoot = False
         self.kill_all_enemies = False
         self.enter_the_door = False
+        self.use_key = False
 
-    def draw_text(self, text, size, x, y, color, type='menu', font_type='regular'):
+    def draw_text(self, text, size, x, y, color, type='menu', pos_type='center', font_type='regular'):
         if font_type == 'title':
             font = pygame.font.Font(self.title_font_name, size)
         else:
             font = pygame.font.Font(self.font_name, size)
         text_surface = font.render(text, True, color)
         text_rect = text_surface.get_rect()
-        text_rect.center = (x, y)
+
+        if pos_type == 'center':
+            text_rect.center = (x, y)
+        elif pos_type == 'bottomleft':
+            text_rect.bottomleft = (x, y)
+
         if type == 'game':
             self.display.blit(text_surface, text_rect)
             return text_rect

@@ -21,6 +21,13 @@ class Bomb:
         self.explosion_sheet = Spritesheet('data/assets/sprites/explosion/explosion.png')
         self.help_variable = 0
 
+        # new
+
+        self.spawn_tick = pygame.time.get_ticks()
+
+    def update(self):
+        pass
+
     def draw_bomb(self, s, display, image):
         if not self.explosion_rect:
             display.blit(image[self.frame], (self.bomb_rect.x - s[0], self.bomb_rect.y - s[1]))

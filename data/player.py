@@ -1,16 +1,18 @@
 import pygame
 from data.images import Spritesheet
+from data.cutscene import CutScene0
 
 
 class Player(pygame.sprite.Sprite):
 
-    def __init__(self):
+    def __init__(self, window):
         pygame.sprite.Sprite.__init__(self)
 
         x_start = 232
         y_start = 256
         self.rect = pygame.Rect(x_start, y_start, 16, 16)
         self.left_key, self.right_key, self.up_key, self.down_key = False, False, False, False
+        self.text_color = (255, 219, 88)
 
         # new
 
@@ -19,9 +21,52 @@ class Player(pygame.sprite.Sprite):
         self.velocity = pygame.math.Vector2(0, 0)
         self.acceleration = pygame.math.Vector2(0, 0)
 
-        # old
+        self.missile_vector = pygame.math.Vector2(0, 0)
+        self.busy = False
+        self.in_cutscene = False
 
-        self.player_hearts = 3
+        self.talk_pos = []
+        self.talk = False
+        self.quotes = ['THERE IS TOO DARK']
+
+        # stats
+
+        self.level = 1
+        self.current_health = 100
+        self.max_health = 100
+        self.armor = 0
+        self.coins = 0
+        self.immune_to_dmg = False
+        self.dmg_tick = 0
+
+        # health bar
+
+        window_w = window[0] / 2
+        window_h = window[1] / 2
+        self.health_bar = pygame.Rect(0, 0, window_w * .25, window_h * .05)
+        self.health_bar.topright = (window_w * .95, window_h * .03)
+        self.bar_width = self.health_bar.width
+        self.border = pygame.Rect(0, 0, window_w * .25, window_h * .05)
+        self.border.topright = (window_w * .95, window_h * .03)
+        self.text_pos = self.health_bar.center
+
+        # other bar
+        self.current_xp = 0
+        self.next_lvl = 1000
+
+        self.xp_bar = pygame.Rect(0, 0, window_w * .25, window_h * .05)
+        self.xp_bar.topleft = (window_w * .05, window_h * .03)
+        self.xp_width = self.xp_bar.width
+
+        self.xp_border = pygame.Rect(0, 0, window_w * .25, window_h * .05)
+        self.xp_border.topleft = (window_w * .05, window_h * .03)
+        self.xp_text_pos = self.xp_bar.center
+
+        self.gain_xp(100)
+        # self.xp_bar.width = self.xp_width * self.current_xp / self.next_lvl
+
+        # old 10
+
         self.frame = 0
 
         self.action = 'idle'
@@ -31,7 +76,6 @@ class Player(pygame.sprite.Sprite):
 
         self.on_bomb = False
         self.bomb_number = 1
-        self.coins = 0
         self.temp = 0
 
         self.animation_left = []
@@ -56,26 +100,81 @@ class Player(pygame.sprite.Sprite):
             self.animation_up.append(image_u)
             self.animation_left.append(pygame.transform.flip(image_r, True, False))
 
-    def draw_player(self, s, display):
+    def draw(self, s, display, font):
+
+        self.draw_bars(display, font)
         display.blit(self.img, (self.rect.x - 8 - s. x, self.rect.y - 16 - s.y))
 
-    def move_player(self, map_rect, dt):
+    def draw_bars(self, display, font):
+
+        pygame.draw.rect(display, (200, 0, 0), self.health_bar, border_radius=5)
+        pygame.draw.rect(display, (69, 69, 69), self.border, 2, border_radius=5)
+
+        pygame.draw.rect(display, (0, 200, 0), self.xp_bar, border_radius=5)
+        pygame.draw.rect(display, (69, 69, 69), self.xp_border, 2, border_radius=5)
+
+        self.draw_text(display, font,  str(self.current_health) + ' / ' + str(self.max_health), self.text_pos)
+        self.draw_text(display, font, str(self.current_xp) + ' / ' + str(self.next_lvl), self.xp_text_pos)
+
+    def draw_text(self, display, font, t, pos):
+        font = pygame.font.Font(font, 16)
+        text = t
+        text_surface = font.render(text, True, self.text_color)
+        text_rect = text_surface.get_rect()
+        text_rect.center = pos
+        display.blit(text_surface, text_rect)
+
+    def gain_xp(self, xp):
+        self.current_xp += xp
+        percent = self.current_xp / self.next_lvl
+        self.xp_bar.width = self.xp_width * percent
+
+    def take_damage(self, damage):
+
+        if self.immune_to_dmg is False:
+            self.current_health -= damage
+            percent = self.current_health / self.max_health
+            self.health_bar.width = self.bar_width * percent
+            self.immune_to_dmg = True
+            self.dmg_tick = pygame.time.get_ticks()
+
+    def heal(self, health):
+
+        if self.current_health != self.max_health:
+            self.current_health += health
+            percent = self.current_health / self.max_health
+            self.health_bar.width = self.bar_width * percent
+            self.immune_to_dmg = True
+
+    def update(self, map_rect, dt, cut_scene_menager):
+
+        current_tick = pygame.time.get_ticks()
+
+        if self.immune_to_dmg is True:
+            if current_tick - 500 > self.dmg_tick:
+                self.immune_to_dmg = False
+
+        if self.last_tick == 0:
+            # cut_scene_menager.start_cut_scene(CutScene0(self))
+            self.last_tick += 1
+
         self.acceleration.x = 0
         self.acceleration.y = 0
         self.player_stuck = False
 
-        if self.left_key:
-            self.acceleration.x -= .5
-            self.action = 'left'
-        if self.right_key:
-            self.acceleration.x += .5
-            self.action = 'right'
-        if self.down_key:
-            self.acceleration.y += .5
-            self.action = 'down'
-        if self.up_key:
-            self.acceleration.y -= .5
-            self.action = 'up'
+        if self.busy is False and self.in_cutscene is False:
+            if self.left_key:
+                self.acceleration.x -= .5
+                self.action = 'left'
+            if self.right_key:
+                self.acceleration.x += .5
+                self.action = 'right'
+            if self.down_key:
+                self.acceleration.y += .5
+                self.action = 'down'
+            if self.up_key:
+                self.acceleration.y -= .5
+                self.action = 'up'
 
         if self.acceleration.x == 0 and self.acceleration.y == 0:
             self.action = 'idle'
@@ -129,8 +228,10 @@ class Player(pygame.sprite.Sprite):
         if self.action == 'idle' or self.player_stuck is True:
             if self.direction == 'left':
                 self.img = self.animation_left[0]
+                self.missile_vector = pygame.math.Vector2(-1, 0)
             elif self.direction == 'right':
                 self.img = self.animation_right[0]
+                self.missile_vector = pygame.math.Vector2(-1, 0)
             elif self.direction == 'down':
                 self.img = self.animation_down[0]
             elif self.direction == 'up':

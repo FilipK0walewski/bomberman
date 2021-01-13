@@ -9,7 +9,10 @@ class Camera:
         self.player = player
         self.offset = vec(0, 0)
         self.offset_float = vec(0, 0)
-        self.DISPLAY_W, self.DISPLAY_H = 1280 / 2, 720 / 2
+        self.DISPLAY_W, self.DISPLAY_H = pygame.display.get_window_size()
+        self.DISPLAY_W /= 2
+        self.DISPLAY_H /= 2
+
         self.CONST = vec(-self.DISPLAY_W / 2 + player.rect.w / 2, -self.DISPLAY_H / 2 + self.player.rect.h / 2)
 
     def set_method(self, method):
