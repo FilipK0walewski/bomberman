@@ -8,20 +8,37 @@ class PlayerMissile:
         self.direction = direction
 
         self.img = pygame.image.load('data/assets/sprites/missile.png')
-        self.speed = 5
+        self.speed = .8
+        self.friction = -.01
+        self.max_velocity = 5
+        self.acceleration = pygame.math.Vector2(0, 0)
+        self.velocity = pygame.math.Vector2(0, 0)
+        self.position = pygame.math.Vector2(pos)
 
-    def update(self):
+    def update(self, dt):
+
+        self.acceleration.x = 0
+        self.acceleration.y = 0
 
         if self.direction == 'right':
-            self.rect.x += 1 * self.speed
+            self.acceleration.x += self.speed
         elif self.direction == 'left':
-            self.rect.x -= 1 * self.speed
-        elif self.direction == 'down':
-            self.rect.y += 1 * self.speed
+            self.acceleration.x -= self.speed
         elif self.direction == 'up':
-            self.rect.y -= 1 * self.speed
+            self.acceleration.y -= self.speed
         else:
-            self.rect.y += 1 * self.speed
+            self.acceleration.y += self.speed
+
+        self.acceleration += self.velocity * self.friction
+        if abs(self.velocity.x) < self.max_velocity:
+            self.velocity.x += self.acceleration.x * dt
+        if abs(self.velocity.y) < self.max_velocity:
+            self.velocity.y += self.acceleration.y * dt
+
+        self.friction -= .002
+
+        self.position += self.velocity * dt + (self.acceleration * .5) * (dt * dt)
+        self.rect.x, self.rect.y = self.position
 
     def draw(self, s, display):
         display.blit(self.img, (self.rect.x - s[0], self.rect.y - s[1]))
@@ -42,21 +59,36 @@ class Missile:
         delta_y = vector[1] - pos[1]
         self.angle = math.atan2(delta_y, delta_x)
 
-        # self.angle = angle * math.pi / 180
+        self.friction = -.01
+        self.max_velocity = 10
+        self.acceleration = pygame.math.Vector2(0, 0)
+        self.velocity = pygame.math.Vector2(0, 0)
+        self.position = pygame.math.Vector2(pos)
 
         self.speed = 0
         if self.type == 'axe':
-            self.speed = 10
+            self.speed = .1
         elif self.type == 'bullet':
-            self.speed = 3
+            self.speed = .4
 
-    def update(self):
+    def update(self, dt):
 
-        x_move = self.speed * math.cos(self.angle)
-        y_move = self.speed * math.sin(self.angle)
+        x_move = math.cos(self.angle)
+        y_move = math.sin(self.angle)
 
-        self.rect.x += x_move
-        self.rect.y += y_move
+        self.acceleration.x += x_move * .05
+        self.acceleration.y += y_move * .05
+
+        if abs(self.velocity.x) < self.max_velocity:
+            self.velocity.x += self.acceleration.x * dt
+        if abs(self.velocity.y) < self.max_velocity:
+            self.velocity.y += self.acceleration.y * dt
+
+        if abs(self.velocity.x) > .1 and abs(self.velocity.y) > .1:
+            self.friction -= .001
+
+        self.position += self.velocity * dt + (self.acceleration * .5) * (dt * dt)
+        self.rect.x, self.rect.y = self.position
 
     def draw(self, s, display):
         if self.type == 'bullet':

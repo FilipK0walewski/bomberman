@@ -24,14 +24,27 @@ class Bomb:
         # new
 
         self.spawn_tick = pygame.time.get_ticks()
+        self.explosion_tick = 0
+        self.temp = False
+
+        # menu
+
+        self.falling_bomb_pos = pygame.math.Vector2(bomb_rect.x, bomb_rect.y)
+        self.velocity = 0
+        self.gravity = .2
 
     def update(self):
         pass
 
     def draw_bomb(self, s, display, image):
         if not self.explosion_rect:
+            tick = pygame.time.get_ticks()
+
             display.blit(image[self.frame], (self.bomb_rect.x - s[0], self.bomb_rect.y - s[1]))
-            self.frame += 1
+
+            if tick - 600 > self.spawn_tick:
+                self.spawn_tick = tick
+                self.frame += 1
             if self.frame == len(image):
                 self.frame -= 1
 
@@ -78,15 +91,16 @@ class Bomb:
 
                 display.blit(image, (tile.x - s[0], tile.y - s[1]))
 
-            if self.frame % 3 == 0:
-                self.explosion_frame += self.value
-            self.frame += 1
+                if self.temp is False:
+                    self.explosion_tick = pygame.time.get_ticks()
+                    self.temp = True
 
-            if self.explosion_frame == 7:
-                self.value = self.value * (-1)
-                self.explosion_frame += self.value
-            if self.explosion_frame == 0 and self.value < 0:
-                self.value = self.value * (-1)
+                tick = pygame.time.get_ticks()
+                if tick - 70 > self.explosion_tick:
+                    self.explosion_tick = tick
+                    self.explosion_frame += 1
+                    if self.explosion_frame == 7:
+                        self.explosion_frame -= 1
 
     def collision_test(self, hit_box):
         hit_list = []
@@ -154,6 +168,8 @@ class Bomb:
                         self.explosion_rect.append(temp_rect)
                 x += 1
 
-    def bomb_falling(self, display, img):
-        self.bomb_rect.y += 1
+    def bomb_falling(self, display, img, dt):
+        self.velocity += self.gravity * dt
+        self.falling_bomb_pos.y += self.velocity * dt + (self.gravity * .5) * (dt * dt)
+        self.bomb_rect.y = self.falling_bomb_pos.y
         display.blit(img, (self.bomb_rect.x, self.bomb_rect.y))

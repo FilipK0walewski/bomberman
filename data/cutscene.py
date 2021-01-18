@@ -15,34 +15,25 @@ class CutScene0:
     def __init__(self, player):
 
         self.player = player
+        self.player.in_cutscene = True
 
         self.name = 'game_beginning'
         self.timer = pygame.time.get_ticks()
         self.running = True
         self.talk = True
 
-        self.quotes = ['FILIP KOWALEWSKI', '...', "LET'S GO"]
+        self.quotes = ['Press space', 'Watch out fot cockroaches', 'ogunie', 'ben ben']
         self.quote_number = 0
         self.quotation_counter = 0
 
-    def update(self):
-        self.player.in_cutscene = True
-        temp_timer = pygame.time.get_ticks()
-
-        if temp_timer - 250 > self.timer:
-            keys = pygame.key.get_pressed()
-            space = keys[pygame.K_SPACE]
-        else:
-            space = 0
+    def update(self, dt, space):
 
         if int(self.quotation_counter) < len(self.quotes[self.quote_number]):
-            self.quotation_counter += .1
+            self.quotation_counter += .1 * dt
             if space:
-                self.timer = temp_timer
                 self.quotation_counter = len(self.quotes[self.quote_number])
         else:
             if space:
-                self.timer = temp_timer
                 if self.quote_number == len(self.quotes) - 1:
                     self.running = False
                     self.player.in_cutscene = False
@@ -52,9 +43,9 @@ class CutScene0:
                         self.quote_number += 1
                         self.quotation_counter = 0
 
-    def draw(self, display, font, color, pos):
+    def draw(self, display, font, color, rect):
             n = int(self.quotation_counter)
-            draw_text((pos[0] / 2, pos[1] / 8), self.quotes[self.quote_number][0:n], display, font, color)
+            draw_text(rect.center, self.quotes[self.quote_number][0:n], display, font, color)
 
 
 class BossSmallTalk:
@@ -69,8 +60,8 @@ class BossSmallTalk:
         self.boss = boss
 
         self.phase = 0
-        self.boss_quotes = ['HA HA HA', 'HA HA HA HA', 'HA HA']
-        self.player_quotes = ['OH NO', 'HERE WE GO AGAIN...']
+        self.boss_quotes = ['HA HA HA', 'AAAAAAAAAAAAAAAAAAAAAA', 'HA HA']
+        self.player_quotes = ['KAROL?', 'HERE WE GO AGAIN...']
         self.display_quote = ''
 
         self.quote_number = 0
@@ -94,21 +85,16 @@ class BossSmallTalk:
         self.image = self.boss_anim[0]
         self.frame = 0
 
-    def update(self):
+    def update(self, dt, space):
 
         temp_timer = pygame.time.get_ticks()
-
-        if temp_timer - 500 > self.timer:
-            keys = pygame.key.get_pressed()
-            space = keys[pygame.K_SPACE]
-        else:
-            space = 0
 
         if self.phase == 0:
             self.boss.in_cut_scene = True
             self.player.in_cutscene = True
+
             if abs(self.boss.rect.center[0] - self.player.rect.center[0]) > 128:
-                self.boss.position.x += 1
+                self.boss.position.x += 2 * dt
             else:
                 self.talk = True
                 self.phase += 1
@@ -130,7 +116,7 @@ class BossSmallTalk:
                 self.frame = (self.frame + 1) % len(self.boss_anim)
 
             if int(self.quotation_counter) < len(self.display_quote):
-                self.quotation_counter += .1
+                self.quotation_counter += .1 * dt
                 if space:
                     self.timer = temp_timer
                     self.quotation_counter = len(self.display_quote)
@@ -148,19 +134,21 @@ class BossSmallTalk:
             self.player.in_cutscene = False
             self.talk = False
 
-            if self.boss.max_health > 2 * self.boss.health:
+            if self.boss.max_health > 2 * self.boss.current_health:
                 self.phase += 1
 
         if self.phase == 3:
-
+            self.boss.in_cut_scene = True
             self.player.in_cutscene = True
-            if abs(self.boss.rect.center[0] - self.player.rect.center[0]) > 128:
+            difference = self.boss.rect.center[0] - self.player.rect.center[0]
+            if abs(difference) > 128:
+                self.boss.position.x -= difference * .1
                 self.quotation_counter = 0
             else:
-                self.boss.in_cut_scene = True
                 self.talk = True
                 self.dialogue = 0
-                self.display_quote = self.boss_quotes[0]
+                self.boss.img_color = (255, 0, 32)
+                self.display_quote = "I'M ANGRY !!!"
                 self.image = self.boss_anim[self.frame]
 
                 if int(self.quotation_counter) < len(self.display_quote):
@@ -171,22 +159,27 @@ class BossSmallTalk:
                     self.frame = (self.frame + 1) % len(self.boss_anim)
 
                 if space:
-                    self.boss.go_to_pos.x = 2000
+                    self.boss.vector.x = self.boss.window_w / 32
+                    self.boss.vector.y = 0
+                    self.boss.angle = 180
                     self.phase += 1
 
         if self.phase == 4:
+
+            self.boss.img_color = (255, 0, 32)
             self.boss.in_cut_scene = False
             self.player.in_cutscene = False
             self.talk = False
 
-            if self.boss.max_health > 8 * self.boss.health:
+            if self.boss.max_health > 8 * self.boss.current_health:
                 self.phase += 1
 
         if self.phase == 5:
             self.boss.in_cut_scene = True
             self.player.in_cutscene = True
-            if abs(self.boss.rect.center[0] - self.player.rect.center[0]) > 128:
-                self.boss.position.x += 1
+            difference = self.boss.rect.center[0] - self.player.rect.center[0]
+            if abs(difference) > 128:
+                self.boss.position.x -= difference * .1
                 self.quotation_counter = 0
             else:
                 self.talk = True
@@ -202,22 +195,34 @@ class BossSmallTalk:
                     self.frame = (self.frame + 1) % len(self.boss_anim)
 
                 if space:
-                    self.talk = False
-                    self.player.in_cutscene = False
-                    self.boss.in_cut_scene = False
-                    self.running = False
+                    self.boss.vector.x = self.boss.window_w / 16
+                    self.boss.vector.y = 0
+                    self.boss.angle = 90
+                    self.phase += 1
 
-                    self.boss.defeated = True
+        if self.phase == 6:
+            self.boss.in_cut_scene = True
+            self.player.in_cutscene = True
+            self.talk = False
+            self.boss.angle = 90
 
-    def draw(self, display, font, color, pos):
+            if abs(self.boss.rect.center[0] - self.player.rect.center[0]) < 1024:
+                self.boss.position.x -= 4 * dt
+            else:
+                self.boss.in_cut_scene = False
+                self.player.in_cutscene = False
+                self.running = False
+                self.boss.defeated = True
+
+    def draw(self, display, font, color, rect):
         if self.talk is True:
             n = int(self.quotation_counter)
-            draw_text((pos[0] / 2, pos[1] / 8), self.display_quote[0:n], display, font, color)
+            draw_text(rect.center, self.display_quote[0:n], display, font, color)
 
             if self.dialogue % 2 == 0:
-                display.blit(self.image, (pos[0] / 4, pos[1] / 8 - 16))
+                display.blit(self.image, (rect.center[0] * .5, (rect.center[1] + self.image.get_width()) * .5))
             else:
-                display.blit(self.image, (3 * pos[0] / 4, pos[1] / 8 - 16))
+                display.blit(self.image, (rect.center[0] * 1.5, (rect.center[1] + self.image.get_width()) * .5))
 
 
 class CutSceneMenager:
@@ -234,7 +239,7 @@ class CutSceneMenager:
         self.window_w = window_size[0] / 2
         self.window_h = window_size[1] / 2
 
-        self.window_pos = -self.display.get_height() * .25
+        self.bg_rect = pygame.Rect(0, -self.window_h / 4, self.window_w, self.window_h / 4)
 
     def start_cut_scene(self, cut_scene):
         if cut_scene.name not in self.cut_scenes_completed:
@@ -243,27 +248,31 @@ class CutSceneMenager:
             self.cut_scene_running = True
 
     def end_cut_scene(self):
-        self.window_pos = -self.display.get_height() * .25
+
         self.cut_scene = None
         self.cut_scene_running = False
 
-    def update(self):
+    def update(self, dt, space):
         if self.cut_scene_running:
-            if self.window_pos < 0 and self.cut_scene.talk is True:
-                self.window_pos += 1
+            if self.bg_rect.y < 0 and self.cut_scene.talk is True:
+                if dt < 50:
+                    self.bg_rect.y += 3 * dt
             else:
-                self.cut_scene.update()
+                self.cut_scene.update(dt, space)
 
-            if self.cut_scene.talk is False and self.window_pos > -self.display.get_height() * .25:
-                self.window_pos -= 5
+            if self.cut_scene.talk is False and self.bg_rect.y + self.bg_rect.height > 0:
+                self.bg_rect.y -= 5 * dt
             self.cut_scene_running = self.cut_scene.running
         else:
-            self.end_cut_scene()
+            if self.bg_rect.y + self.bg_rect.height > 0:
+                self.bg_rect.y -= 3 * dt
+            else:
+                self.end_cut_scene()
 
     def draw(self):
-        if self.cut_scene_running:
-            if self.window_pos != self.display.get_height() * .25:
-                pygame.draw.rect(self.display, self.bg_color, (0, self.window_pos, self.window_w, self.display.get_height() * .25), border_radius=15)
-                pygame.draw.rect(self.display, self.color, (0, self.window_pos, self.window_w, self.display.get_height() * .25), 10, border_radius=15)
+        if self.bg_rect.y + self.bg_rect.height > 0:
+            if self.bg_rect.y != self.display.get_height() * .25:
+                pygame.draw.rect(self.display, self.bg_color, self.bg_rect, border_radius=15)
+                pygame.draw.rect(self.display, self.color, self.bg_rect, 10, border_radius=15)
 
-            self.cut_scene.draw(self.display, self.font, self.color, (self.window_w, self.window_h))
+            self.cut_scene.draw(self.display, self.font, self.color, self.bg_rect)

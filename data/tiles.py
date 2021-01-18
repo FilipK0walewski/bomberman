@@ -36,7 +36,9 @@ class TileMap:
         self.door = []
         self.coin = []
         self.terminals = []
-        self.message = []
+        self.other = []
+
+        self.just_floor = []
 
         self.map_h, self.map_w = 0, 0
         self.map = []
@@ -48,30 +50,118 @@ class TileMap:
     def get_level_size(self):
         return self.map_w, self.map_h
 
+    def get_turn_rect(self):
+        r = []
+        chest_r = []
+        turn_rect = []
+
+        for tile in self.chest:
+            chest_r.append(tile)
+        for tile in self.wall:
+            chest_r.append(tile.rect)
+
+        for tile in self.floor:
+            if tile.rect not in chest_r:
+                r.append(tile.rect)
+
+        for tile in r:
+            temp_tile_l = tile.copy()
+            temp_tile_r = tile.copy()
+            temp_tile_u = tile.copy()
+            temp_tile_d = tile.copy()
+            temp_tile_l.x -= 32
+            temp_tile_r.x += 32
+            temp_tile_u.y -= 32
+            temp_tile_d.y += 32
+
+            temp_int = 0
+
+            if temp_tile_r in r:
+                temp_int += 1
+            if temp_tile_l in r:
+                temp_int += 1
+            if temp_tile_u in r:
+                temp_int += 1
+            if temp_tile_d in r:
+                temp_int += 1
+
+            if temp_int >= 3:
+                turn_rect.append(tile)
+
+        return turn_rect
+
     def wall_destroying(self, explosion_rect):
 
-        r = self.get_soft_wall()
+        r = []
         i = 0
-        for rect in r:
-            for tile in explosion_rect:
-                if rect.colliderect(tile):
+        turns = []
 
-                    for element in self.chest:
-                        if element.rect == rect:
-                            self.chest.remove(element)
+        for tile in explosion_rect:
+            for chest in self.chest:
+                if chest.rect.collidepoint(tile.center):
+                    i += 1
+                    r.append(chest.rect)
+                    self.just_floor.append(chest.rect)
+                    self.chest.remove(chest)
+
                     # coin
                     if random.randint(1, 2) == 1:
-                        self.coin.append(Tile('coin', rect.x, rect.y, self.spritesheet))
+                        self.coin.append(Tile('coin', chest.rect.x, chest.rect.y, self.spritesheet))
 
-            i += 1
-        self.load_map()
+        new_r = []
+        for rect in r:
+            temp_tile_l = rect.copy()
+            temp_tile_r = rect.copy()
+            temp_tile_u = rect.copy()
+            temp_tile_d = rect.copy()
+            temp_tile_l.x -= 32
+            temp_tile_r.x += 32
+            temp_tile_u.y -= 32
+            temp_tile_d.y += 32
+            if temp_tile_l in self.just_floor:
+                new_r.append(temp_tile_l)
+            if temp_tile_r in self.just_floor:
+                new_r.append(temp_tile_r)
+            if temp_tile_u in self.just_floor:
+                new_r.append(temp_tile_u)
+            if temp_tile_d in self.just_floor:
+                new_r.append(temp_tile_d)
+            new_r.append(rect)
+
+        for tile in new_r:
+            temp_tile_l = tile.copy()
+            temp_tile_r = tile.copy()
+            temp_tile_u = tile.copy()
+            temp_tile_d = tile.copy()
+            temp_tile_l.x -= 32
+            temp_tile_r.x += 32
+            temp_tile_u.y -= 32
+            temp_tile_d.y += 32
+
+            temp_int = 0
+
+            if temp_tile_r in self.just_floor:
+                temp_int += 1
+            if temp_tile_l in self.just_floor:
+                temp_int += 1
+            if temp_tile_u in self.just_floor:
+                temp_int += 1
+            if temp_tile_d in self.just_floor:
+                temp_int += 1
+
+            if temp_int >= 3:
+                turns.append(tile)
+
+        if i != 0:
+            self.load_map()
+        return turns
 
     def picking(self, rect, type):
         if type == 'coin':
             for coin in self.coin:
                 if coin.rect == rect:
                     self.coin.remove(coin)
-        self.load_floor()
+        self.load_map()
 
     def get_door_rect(self):
         r = []
@@ -113,6 +203,7 @@ class TileMap:
 
     def get_spawn_rect(self):
         r = []
+
         for tile in self.floor.sprites():
             if tile.spawn is True:
                 r.append(tile.rect)
@@ -132,8 +223,8 @@ class TileMap:
         self.wall.draw(self.map_surface)
         for tile in self.terminals:
             tile.draw(self.map_surface)
-        if len(self.message) != 0:
-            self.message[0].draw(self.map_surface)
+        for tile in self.other:
+            tile.draw(self.map_surface)
 
     def load_doors(self):
         for tile in self.door:
@@ -163,6 +254,8 @@ class TileMap:
             for tile in row:
                 if tile == '30':
                     self.floor.add(Tile(random.choice(floor), x * self.tile_size, y * self.tile_size, self.spritesheet, 'floor'))
+                    rect = pygame.Rect(x * self.tile_size, y * self.tile_size, 32, 32)
+                    self.just_floor.append(rect)
                 elif tile[0] == 'd':
                     img = 'background'
                     collider = False
@@ -213,8 +306,24 @@ class TileMap:
                     self.wall.add(Tile('corner_7', x * self.tile_size, y * self.tile_size, self.spritesheet))
                 elif tile == '17':
                     self.wall.add(Tile('corner_6', x * self.tile_size, y * self.tile_size, self.spritesheet))
+                elif tile == '31':
+                    temp = random.randint(0, 100)
+                    if temp % 3 == 0:
+                        self.floor.add(
+                            Tile(random.choice(floor), x * self.tile_size, y * self.tile_size, self.spritesheet,
+                                 'floor'))
+                        self.chest.append(Tile('chest', x * self.tile_size, y * self.tile_size, self.spritesheet))
+                    else:
+                        self.floor.add(
+                            Tile(random.choice(floor), x * self.tile_size, y * self.tile_size, self.spritesheet,
+                                 'floor', True))
+                        rect = pygame.Rect(x * self.tile_size, y * self.tile_size, 32, 32)
+                        self.just_floor.append(rect)
+                        spawn_points += 1
                 elif tile == '32':
                     self.floor.add(Tile(random.choice(floor), x * self.tile_size, y * self.tile_size, self.spritesheet, 'floor', True))
+                    rect = pygame.Rect(x * self.tile_size, y * self.tile_size, 32, 32)
+                    self.just_floor.append(rect)
                     spawn_points += 1
                 elif tile == '33':
                     self.wall.add(Tile('floor_f', x * self.tile_size, y * self.tile_size, self.spritesheet))
@@ -228,11 +337,8 @@ class TileMap:
                 elif tile == 't':
                     self.wall.add(Tile('wall_1', x * self.tile_size, y * self.tile_size, self.spritesheet))
                     self.terminals.append(Tile('terminal', x * self.tile_size, y * self.tile_size, self.spritesheet))
-                elif tile == 'm':
-                    self.floor.add(Tile('floor_0', x * self.tile_size, y * self.tile_size, self.spritesheet, 'floor'))
-                    self.message.append(Tile('message', x * self.tile_size, y * self.tile_size, self.spritesheet))
                 else:
-                    self.floor.add(Tile('background', x * self.tile_size, y * self.tile_size, self.spritesheet, 'floor'))
+                    self.other.append(Tile('background', x * self.tile_size, y * self.tile_size, self.spritesheet))
 
                 x += 1
             y += 1

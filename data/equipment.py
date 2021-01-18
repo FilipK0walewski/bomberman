@@ -14,6 +14,10 @@ class Loot:
         elif type == 'message':
             self.description = text
             self.img = pygame.image.load('data/assets/sprites/message.png')
+        elif type == 'bomb':
+            self.description = text
+            bomb_sheet = Spritesheet('data/assets/sprites/spritesheet.png')
+            self.img = bomb_sheet.parse_sprite('bomb_1')
 
         self.available = False
         self.level = level
@@ -45,6 +49,7 @@ class ItemSlot:
         self.rect = pygame.Rect(pos[0], pos[1], 32, 32)
         self.img = None
         self.color = (64, 0, 0)
+        self.font_size = 12
 
         self.player = player
         self.type = None
@@ -53,22 +58,42 @@ class ItemSlot:
         self.info_rect = pygame.Rect(0, 0, window[0] / 8, window[1] / 8)
         self.info_rect.center = (window[0] / 4, window[1] * .4)
 
-    def use(self, chest=False):
+    def use(self, chest=False, take_all=False):
 
         if self.type == 'lesser_health_potion':
             if chest is False:
                 self.player.heal(10)
-            self.stored -= 1
-            if self.stored <= 0:
+            if take_all is True:
+                self.stored = 0
                 self.img = None
                 self.empty = True
+            else:
+                self.stored -= 1
+                if self.stored <= 0:
+                    self.img = None
+                    self.empty = True
+
         elif self.type == 'message':
             if chest is True:
-                pass
+                self.stored -= 1
+                if self.stored <= 0:
+                    self.img = None
+                    self.empty = True
             else:
-                print(self.description)
                 temp = self.draw_info
                 self.draw_info = not temp
+
+        elif self.type == 'bomb':
+            if chest is True:
+                if take_all is True:
+                    self.stored = 0
+                    self.img = None
+                    self.empty = True
+                else:
+                    self.stored -= 1
+                    if self.stored <= 0:
+                        self.img = None
+                        self.empty = True
 
     def update(self):
 
@@ -87,11 +112,11 @@ class ItemSlot:
         pygame.draw.rect(display, self.color, temp_rect, border_bottom_left_radius=10, border_top_right_radius=10)
         if self.img is not None:
             display.blit(self.img, (self.rect.x - camera[0], self.rect.y - camera[1]))
-            draw_text((self.rect.centerx - camera[0], self.rect.centery - camera[1]), 'topleft', str(self.stored), display, (18, 18, 18), font)
+            draw_text((self.rect.centerx - camera[0], self.rect.centery - camera[1]), 'topleft', str(self.stored), display, (18, 18, 18), font, self.font_size)
 
             if self.draw_info is True:
                 # pygame.draw.rect(display, (0, 255, 0), self.info_rect, border_radius=-10)
-                draw_text(self.info_rect.center, 'center', self.description, display, (0, 0, 255), font)
+                draw_text(self.info_rect.center, 'center', self.description, display, (0, 0, 255), font, self.font_size)
 
 
 class Chest:
@@ -118,6 +143,7 @@ class Chest:
 
         self.selected = 0
         self.move = False
+        self.move_all = False
 
         x, y = self.item_rect.topleft
         _id = 0
@@ -162,19 +188,23 @@ class Chest:
 
         for item in self.items:
             if self.selected == item.id:
-                # print(item.img)
                 item.selected = True
                 item.update()
             else:
                 item.selected = False
                 item.update()
 
-            if item.selected is True and self.move is True:
-                print(item.description)
-                item.empty = False
-                backpack.add_item(item)
-                item.use(True)
-                self.move = False
+            if item.selected is True:
+                if self.move is True:
+                    item.empty = False
+                    backpack.add_item(item)
+                    item.use(True)
+                    self.move = False
+                elif self.move_all is True:
+                    for i in range(item.stored):
+                        backpack.add_item(item)
+                    item.use(True, True)
+                    self.move_all = False
 
     def draw(self, display, camera, font):
         if self.available:
@@ -197,6 +227,7 @@ class Equipment:
         self.window_w = window[0] / 2
         self.window_h = window[1] / 2
         self.font = font
+        self.font_size = int(window[1] / 50)
 
         self.padding_top = self.window_h * .1
         self.padding_side = self.window_w * .1
@@ -213,7 +244,7 @@ class Equipment:
 
         # menu
 
-        self.side_menu = [['STATS', 0], ['ITEMS', 1], ['EQUIPMENT', 2]]
+        self.side_menu = [['STATS', 0], ['ITEMS', 1]]
         self.menu_position = 0
         self.use = False
 
@@ -242,6 +273,7 @@ class Equipment:
 
         self.coins = player.coins
         self.level = player.level
+        self.bomb_number = 0
 
     def add_item(self, new_item):
         added = False
@@ -268,7 +300,10 @@ class Equipment:
 
         return number
 
-    def update(self, coins=0):
+    def update(self, player, dt):
+
+        self.coins = player.coins
+        self.level = player.level
 
         if self.menu_position >= len(self.side_menu):
             self.menu_position = 0
@@ -280,6 +315,7 @@ class Equipment:
         if self.selected < 0:
             self.selected = self.item_slots - 1
 
+        temp = 0
         for item in self.items:
             if self.selected == item.id:
                 item.selected = True
@@ -294,20 +330,25 @@ class Equipment:
                     item.use()
                     self.use = False
 
+            if item.type == 'bomb':
+                temp += item.stored
+
+        self.bomb_number = temp
+
+        if dt > 50:
+            dt = 1
+
         if self.visible is True:
             if self.bg_rect.y >= self.padding_top:
-                self.bg_rect.y -= 5
+                self.bg_rect.y -= 5 * dt
 
                 for item in self.items:
-                    item.rect.y -= 5
+                    item.rect.y -= 5 * dt
         else:
             if self.bg_rect.y <= self.window_h:
-                self.bg_rect.y += 5
+                self.bg_rect.y += 5 * dt
                 for item in self.items:
-                    item.rect.y += 5
-
-        if self.coins != coins:
-            self.coins = coins
+                    item.rect.y += 5 * dt
 
     def draw(self, display):
         if self.bg_rect.y <= self.window_h:
@@ -325,26 +366,33 @@ class Equipment:
                 else:
                     color = self.font_color
                 draw_text((self.bg_rect.x + self.spacing_side, y), 'topleft',
-                          text[0], display, color, self.font)
+                          text[0], display, color, self.font, self.font_size)
                 y += 16 + self.spacing_top
 
             if self.menu_position == 0:
                 draw_text((self.bg_rect.x + self.bg_rect.width * .2 + self.spacing_side, self.bg_rect.y + self.spacing_top),
                           'topleft',
-                          'COINS: ' + str(self.coins), display, self.font_color, self.font)
+                          'COINS: ' + str(self.coins), display, self.font_color, self.font, self.font_size)
+
                 draw_text(
                     (self.bg_rect.x + self.bg_rect.width * .2 + self.spacing_side,
                      self.bg_rect.y + 16 + 2 * self.spacing_top),
                     'topleft',
-                    'LEVEL: ' + str(self.level), display, self.font_color, self.font)
+                    'LEVEL: ' + str(self.level), display, self.font_color, self.font, self.font_size)
+
+                draw_text(
+                    (self.bg_rect.x + self.bg_rect.width * .2 + self.spacing_side,
+                     self.bg_rect.y + 32 + 2 * self.spacing_top),
+                    'topleft',
+                    'BOMBS: ' + str(self.bomb_number), display, self.font_color, self.font, self.font_size)
 
             elif self.menu_position == 1:
                 for item in self.items:
                     item.draw(display, self.font)
 
 
-def draw_text(pos, pos_placement, text, display, color, font):
-    font = pygame.font.Font(font, 16)
+def draw_text(pos, pos_placement, text, display, color, font, font_size):
+    font = pygame.font.Font(font, font_size)
     text_surface = font.render(text, True, color)
     text_rect = text_surface.get_rect()
     if pos_placement == 'topleft':

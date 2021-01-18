@@ -1,177 +1,206 @@
 import pygame, random
 
 
-class Enemy:
+class Enemy(pygame.sprite.Sprite):
 
-    def __init__(self, spawn_rect, bug, death):
-
+    def __init__(self, spawn_rect, bug, death, type='normal'):
+        pygame.sprite.Sprite.__init__(self)
         r = random.choice(spawn_rect)
+        self.rect = bug[0].get_rect()
+        self.type = type
 
-        self.immune_to_dmg = True
+        if type == 'mutant':
+            self.speed = .3
+        else:
+            self.speed = .2
+
+        self.friction = -.08
+        self.max_velocity = 6
+        self.acceleration = pygame.math.Vector2(0, 0)
+        self.velocity = pygame.math.Vector2(0, 0)
+        self.position = pygame.math.Vector2(r.x, r.y)
+
+        self.rect.x = self.position.x
+        self.rect.y = self.position.y
+
+        self.immune_to_dmg = False
+        self.damage_tick = 0
+
         self.spawn_tick = pygame.time.get_ticks()
         self.to_remove = False
+        self.stuck = False
+        self.on_bomb = False
 
-        self.spawn_rect = spawn_rect
         self.turn_rect = []
-        self.enemy_rect = pygame.Rect(r.x, r.y, 32, 32)
-        self.movement = [0, 0]
-        self.enemy_hp = 100
-        self.unstuck_tick = 0
 
-        self.directions = {'right', 'left', 'up', 'down'}
-        self.direction = 'right'
+        if type == 'mutant':
+            self.color = (255, 0, 144)
+            self.enemy_hp = 300
+        else:
+            self.enemy_hp = 100
+
+        self.directions = ['right', 'left', 'up', 'down']
+        self.direction = random.choice(self.directions)
 
         self.flip = False
         self.angle = 90
-        self.start = True
-        self.coords = []
-        self.enemy_stuck = False
-        self.enemy_hardstuck = False
 
         self.frame = 0
         self.death_frame = 0
+        self.anim_tick = 0
 
         self.death_animation = death
         self.bug_animation = bug
 
-        self.find_place_to_turn()
-
     def draw_enemy(self, scroll, display):
 
         if self.enemy_hp > 0:
-            if self.enemy_stuck is False:
-                temp = pygame.transform.rotate(self.bug_animation[self.frame], self.angle)
-                display.blit(pygame.transform.flip(temp, self.flip, False),
-                                                  (self.enemy_rect.x - scroll[0], self.enemy_rect.y - scroll[1]))
+            tick = pygame.time.get_ticks()
+            if self.stuck is False:
+                img = pygame.transform.rotate(self.bug_animation[self.frame], self.angle)
+            else:
+                self.flip = False
+                self.angle = 0
+                img = pygame.transform.rotate(self.bug_animation[0], self.angle)
+            if self.type == 'mutant':
+                temp = pygame.Surface(img.get_size())
+                temp.fill(self.color)
+
+                output_image = img.copy()
+                output_image.blit(temp, (0, 0), special_flags=pygame.BLEND_MULT)
+            else:
+                output_image = img
+
+            display.blit(pygame.transform.flip(output_image, self.flip, False), (self.rect.x - scroll[0], self.rect.y - scroll[1]))
+
+            if tick - 100 > self.anim_tick:
+                self.anim_tick = tick
                 self.frame += 1
                 if self.frame % len(self.bug_animation) == 0:
                     self.frame = 0
-            else:
-                display.blit(self.bug_animation[0], (self.enemy_rect.x - scroll[0], self.enemy_rect.y - scroll[1]))
+
         else:
-            display.blit(self.death_animation[self.death_frame], (self.enemy_rect.x - scroll[0], self.enemy_rect.y - scroll[1]))
-            self.death_frame += 1
-            if self.death_frame % len(self.death_animation) == 0:
-                self.to_remove = True
-                self.death_frame = 0
+            tick = pygame.time.get_ticks()
+            display.blit(self.death_animation[self.death_frame], (self.rect.x - scroll[0], self.rect.y - scroll[1]))
+            if tick - 100 > self.anim_tick:
+                self.death_frame += 1
+                if self.death_frame % len(self.death_animation) == 0:
+                    self.to_remove = True
+                    self.death_frame = 0
 
-    def move_enemy(self, map_rect, bomb_rect):
-        self.coords.append([self.enemy_rect.x, self.enemy_rect.y])
+    def update(self, map_rect, bomb_rect, turn_rect, player_pos, dt):
 
-        if len(self.coords) == 2:
-            if self.coords[0] == self.coords[1]:
-                self.enemy_stuck = True
-                if pygame.time.get_ticks() - self.unstuck_tick > 10000:
-                    self.enemy_hardstuck = True
-            else:
-                self.unstuck_tick = pygame.time.get_ticks()
-                self.enemy_hardstuck = False
-                self.enemy_stuck = False
+        if self.immune_to_dmg is True:
+            if pygame.time.get_ticks() - 500 > self.damage_tick:
+                self.immune_to_dmg = False
 
-        if pygame.time.get_ticks() - self.spawn_tick >= 1000:
-            self.immune_to_dmg = False
-        if self.start is True:
-            self.direction = random.choice(list(self.directions))
-            self.start = False
-
-        if self.enemy_hardstuck is True:
-            self.direction = 'idle'
-            if pygame.time.get_ticks() % 5000 >= 4000:
-                self.direction = random.choice(list(self.directions))
-                self.enemy_hardstuck = False
+        self.acceleration.x = 0
+        self.acceleration.y = 0
 
         if self.direction == 'right':
-            self.movement[0] = 1
+            self.acceleration.x += self.speed
             self.angle = 270
         elif self.direction == 'left':
-            self.movement[0] = -1
+            self.acceleration.x -= self.speed
             self.angle = 270
         elif self.direction == 'up':
-            self.movement[1] = -1
-            self.angle = 360
+            self.acceleration.y -= self.speed
+            self.angle = 0
         elif self.direction == 'down':
-            self.movement[1] = 1
+            self.acceleration.y += self.speed
             self.angle = 180
         elif self.direction == 'idle':
-            self.movement = [0, 0]
+            self.acceleration.x = 0
+            self.acceleration.y = 0
             self.angle = 180
         if self.direction == 'left':
             self.flip = True
         else:
             self.flip = False
 
-        self.enemy_rect.x += self.movement[0]
-        self.enemy_rect.y += self.movement[1]
+        if self.type == 'mutant':
+            self.speed = .3
+            if abs(player_pos[0] - self.rect.center[0]) < 32:
+                if player_pos[1] > self.rect.center[1] and self.direction == 'down':
+                    self.acceleration *= 2
+                if player_pos[1] < self.rect.center[1] and self.direction == 'up':
+                    self.acceleration *= 2
+            if abs(player_pos[1] - self.rect.center[1]) < 32:
+                if player_pos[0] > self.rect.center[0] and self.direction == 'right':
+                    self.acceleration *= 2
+                if player_pos[0] < self.rect.center[0] and self.direction == 'left':
+                    self.acceleration *= 2
 
-        for tile in self.turn_rect:
-            if tile[0] == self.enemy_rect.x and tile[1] == self.enemy_rect.y:
-                self.direction = random.choice(list(self.directions))
+        self.acceleration += self.velocity * self.friction
 
-        self.bomb_collider(bomb_rect)
+        if abs(self.velocity.x) < self.max_velocity:
+            self.velocity.x += self.acceleration.x * dt
+        if abs(self.velocity.y) < self.max_velocity:
+            self.velocity.y += self.acceleration.y * dt
 
-        for tile in map_rect:
-            if self.enemy_rect.colliderect(tile):
-                if self.movement[0] > 0:
-                    self.enemy_rect.right = tile.left
-                if self.movement[0] < 0:
-                    self.enemy_rect.left = tile.right
-                if self.movement[1] > 0:
-                    self.enemy_rect.bottom = tile.top
-                if self.movement[1] < 0:
-                    self.enemy_rect.top = tile.bottom
-                self.direction = random.choice(list(self.directions))
+        self.position += self.velocity * dt + (self.acceleration * .5) * (dt * dt)
+        self.rect.x = self.position.x
+        self.rect.y = self.position.y
 
-        self.movement = [0, 0]
+        collisions = self.collision_check(map_rect)
+        if self.on_bomb is False:
+            collisions += self.collision_check(bomb_rect)
 
-        if self.enemy_stuck is True:
-            self.flip = False
+        for tile in collisions:
+            if self.velocity.x > 0:
+                self.position.x = tile.x - self.rect.width
+                self.rect.x = self.position.x
+                self.direction = random.choice(self.directions)
+                self.velocity.x = 0
+                self.velocity.y = 0
+            elif self.velocity.x < 0:
+                self.position.x = tile.x + tile.width
+                self.rect.x = self.position.x
+                self.direction = random.choice(self.directions)
+                self.velocity.x = 0
+                self.velocity.y = 0
+            if self.velocity.y > 0:
+                self.position.y = tile.y - self.rect.height
+                self.rect.y = self.position.y
+                self.direction = random.choice(self.directions)
+                self.velocity.x = 0
+                self.velocity.y = 0
+            elif self.velocity.y < 0:
+                self.position.y = tile.y + self.rect.height
+                self.rect.y = self.position.y
+                self.direction = random.choice(self.directions)
+                self.velocity.x = 0
+                self.velocity.y = 0
 
-        if len(self.coords) == 2:
-            self.coords.pop(-1)
+        rand = random.randint(0, 100)
+        for tile in turn_rect:
+            if tile[0] == self.rect.x and tile[1] == self.rect.y:
+                if rand % 3 == 0:
+                    self.direction = random.choice(list(self.directions))
+                    self.velocity.x = 0
+                    self.velocity.y = 0
+                break
 
-    def find_place_to_turn(self):
-        temp_list = []
-        for tile in self.spawn_rect:
-            temp_tile = list(tile)
-            temp_list.append(temp_tile)
-
-        for tile in temp_list:
-            temp_tile_l = tile.copy()
-            temp_tile_r = tile.copy()
-            temp_tile_u = tile.copy()
-            temp_tile_d = tile.copy()
-            temp_tile_l[0] = temp_tile_l[0] - 32
-            temp_tile_r[0] = temp_tile_r[0] + 32
-            temp_tile_u[1] = temp_tile_l[1] - 32
-            temp_tile_d[1] = temp_tile_r[1] + 32
-
-            if temp_tile_r in temp_list and temp_tile_l in temp_list\
-                    and temp_tile_u in temp_list and temp_tile_d in temp_list:
-                self.turn_rect.append(tile)
+        if self.type == 'normal':
+            if abs(self.velocity.x) < .5 and abs(self.velocity.y) < .5:
+                self.stuck = True
+            else:
+                self.stuck = False
+        elif self.type == 'mutant':
+            if abs(self.velocity.x) < 1 and abs(self.velocity.y) < 1:
+                self.stuck = True
+            else:
+                self.stuck = False
 
     def take_damage(self, damage):
         if self.immune_to_dmg is False:
             self.enemy_hp -= damage
+            self.immune_to_dmg = True
+            self.damage_tick = pygame.time.get_ticks()
 
-            if self.enemy_hp > 0:
-                if self.direction == 'right':
-                    self.enemy_rect.x -= 5
-                elif self.direction == 'left':
-                    self.enemy_rect.x += 5
-                elif self.direction == 'up':
-                    self.enemy_rect.y -= 5
-                elif self.direction == 'down':
-                    self.enemy_rect.y += 5
-
-    def bomb_collider(self, bomb_rect):
-        for tile in bomb_rect:
-            if self.enemy_rect.colliderect(tile):
-                if self.movement[0] > 0:
-                    self.enemy_rect.right = tile.left
-                if self.movement[0] < 0:
-                    self.enemy_rect.left = tile.right
-                if self.movement[1] > 0:
-                    self.enemy_rect.bottom = tile.top
-                if self.movement[1] < 0:
-                    self.enemy_rect.top = tile.bottom
-                self.direction = random.choice(list(self.directions))
+    def collision_check(self, tiles):
+        hit_rect = []
+        for tile in tiles:
+            if self.rect.colliderect(tile):
+                hit_rect.append(tile)
+        return hit_rect
