@@ -18,6 +18,10 @@ class Loot:
             self.description = text
             bomb_sheet = Spritesheet('data/assets/sprites/spritesheet.png')
             self.img = bomb_sheet.parse_sprite('bomb_1')
+        elif type == 'coin':
+            self.description = text
+            sprite_sheet = Spritesheet('data/assets/sprites/walls/tileset.png')
+            self.img = sprite_sheet.parse_sprite('coin')
 
         self.available = False
         self.level = level
@@ -55,14 +59,15 @@ class ItemSlot:
         self.type = None
 
         self.draw_info = False
-        self.info_rect = pygame.Rect(0, 0, window[0] / 8, window[1] / 8)
-        self.info_rect.center = (window[0] / 4, window[1] * .4)
+        self.info_rect = pygame.Rect(0, 0, window[0] * .125, window[1] * .125)
+        self.info_rect.center = (window[0] * .25, window[1] * .4)
 
     def use(self, chest=False, take_all=False):
 
         if self.type == 'lesser_health_potion':
             if chest is False:
                 self.player.heal(10)
+
             if take_all is True:
                 self.stored = 0
                 self.img = None
@@ -94,6 +99,21 @@ class ItemSlot:
                     if self.stored <= 0:
                         self.img = None
                         self.empty = True
+
+        elif self.type == 'coin':
+            if chest is True:
+                if take_all is True:
+                    self.stored = 0
+                    self.img = None
+                    self.empty = True
+                else:
+                    self.stored -= 1
+                    if self.stored <= 0:
+                        self.img = None
+                        self.empty = True
+            else:
+                temp = self.draw_info
+                self.draw_info = not temp
 
     def update(self):
 
@@ -224,10 +244,10 @@ class Equipment:
 
         self.visible = False
 
-        self.window_w = window[0] / 2
-        self.window_h = window[1] / 2
+        self.window_w = window[0] * .5
+        self.window_h = window[1] * .5
         self.font = font
-        self.font_size = int(window[1] / 50)
+        self.font_size = int(window[1] * .02)
 
         self.padding_top = self.window_h * .1
         self.padding_side = self.window_w * .1
@@ -278,7 +298,7 @@ class Equipment:
     def add_item(self, new_item):
         added = False
         for item in self.items:
-            if item.description == new_item.description:
+            if item.type == new_item.type:
                 item.stored += 1
                 added = True
                 break
@@ -370,21 +390,12 @@ class Equipment:
                 y += 16 + self.spacing_top
 
             if self.menu_position == 0:
-                draw_text((self.bg_rect.x + self.bg_rect.width * .2 + self.spacing_side, self.bg_rect.y + self.spacing_top),
-                          'topleft',
-                          'COINS: ' + str(self.coins), display, self.font_color, self.font, self.font_size)
 
                 draw_text(
                     (self.bg_rect.x + self.bg_rect.width * .2 + self.spacing_side,
-                     self.bg_rect.y + 16 + 2 * self.spacing_top),
+                     self.bg_rect.y + 16 + self.spacing_top),
                     'topleft',
                     'LEVEL: ' + str(self.level), display, self.font_color, self.font, self.font_size)
-
-                draw_text(
-                    (self.bg_rect.x + self.bg_rect.width * .2 + self.spacing_side,
-                     self.bg_rect.y + 32 + 2 * self.spacing_top),
-                    'topleft',
-                    'BOMBS: ' + str(self.bomb_number), display, self.font_color, self.font, self.font_size)
 
             elif self.menu_position == 1:
                 for item in self.items:

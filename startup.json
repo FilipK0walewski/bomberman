@@ -1,1 +1,7 @@
-{"screen": {"resolution": {"width": 800, "height": 600}, "fullscreen": "off", "ray_tracing": "on", "fps": 75}}
+{"screen":
+{"resolution":
+{"width": 1280,
+  "height": 720
+}, "fullscreen": "off",
+  "ray_tracing": "off",
+  "fps": 75}}

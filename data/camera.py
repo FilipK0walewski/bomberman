@@ -13,7 +13,7 @@ class Camera:
         self.DISPLAY_W /= 2
         self.DISPLAY_H /= 2
 
-        self.CONST = vec(-self.DISPLAY_W / 2 + player.rect.w / 2, -self.DISPLAY_H / 2 + self.player.rect.h / 2)
+        self.CONST = vec(-self.DISPLAY_W * .5 + player.rect.w * .5, -self.DISPLAY_H * .5 + self.player.rect.h * .5)
 
     def set_method(self, method):
         self.method = method

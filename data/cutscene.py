@@ -159,7 +159,7 @@ class BossSmallTalk:
                     self.frame = (self.frame + 1) % len(self.boss_anim)
 
                 if space:
-                    self.boss.vector.x = self.boss.window_w / 32
+                    self.boss.vector.x = self.boss.window_w * .03125
                     self.boss.vector.y = 0
                     self.boss.angle = 180
                     self.phase += 1
@@ -195,7 +195,7 @@ class BossSmallTalk:
                     self.frame = (self.frame + 1) % len(self.boss_anim)
 
                 if space:
-                    self.boss.vector.x = self.boss.window_w / 16
+                    self.boss.vector.x = self.boss.window_w * .0625
                     self.boss.vector.y = 0
                     self.boss.angle = 90
                     self.phase += 1
@@ -236,10 +236,10 @@ class CutSceneMenager:
         self.font = font
         self.color = color
         self.bg_color = bg_color
-        self.window_w = window_size[0] / 2
-        self.window_h = window_size[1] / 2
+        self.window_w = window_size[0] * .5
+        self.window_h = window_size[1] * .5
 
-        self.bg_rect = pygame.Rect(0, -self.window_h / 4, self.window_w, self.window_h / 4)
+        self.bg_rect = pygame.Rect(0, -self.window_h * .25, self.window_w, self.window_h * .25)
 
     def start_cut_scene(self, cut_scene):
         if cut_scene.name not in self.cut_scenes_completed:

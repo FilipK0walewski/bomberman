@@ -13,25 +13,24 @@ class Bomb:
         self.explosion_length = explosion_length
         self.frame = 0
         self.explosion_frame = 0
-        self.value = 1
 
         self.x_edges = []
         self.y_edges = []
         self.bomb_sheet = Spritesheet('data/assets/sprites/spritesheet.png')
         self.explosion_sheet = Spritesheet('data/assets/sprites/explosion/explosion.png')
-        self.help_variable = 0
 
         # new
 
         self.spawn_tick = pygame.time.get_ticks()
         self.explosion_tick = 0
         self.temp = False
+        self.to_remove = False
 
         # menu
 
         self.falling_bomb_pos = pygame.math.Vector2(bomb_rect.x, bomb_rect.y)
         self.velocity = 0
-        self.gravity = .2
+        self.gravity = .3
 
     def update(self):
         pass
@@ -101,6 +100,7 @@ class Bomb:
                     self.explosion_frame += 1
                     if self.explosion_frame == 7:
                         self.explosion_frame -= 1
+                        self.to_remove = True
 
     def collision_test(self, hit_box):
         hit_list = []

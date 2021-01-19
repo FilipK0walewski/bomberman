@@ -17,7 +17,7 @@ class Boss(pygame.sprite.Sprite):
         self.radius = 360
         self.img_color = (255, 255, 255)
 
-        self.position = pygame.math.Vector2(-x / 2, player_rect.y)
+        self.position = pygame.math.Vector2(-x * .5, player_rect.y)
         self.velocity = pygame.math.Vector2(0, 0)
         self.acceleration = pygame.math.Vector2(0, 0)
         self.vector = pygame.math.Vector2(0, 0)
@@ -29,8 +29,8 @@ class Boss(pygame.sprite.Sprite):
 
         self.angle = 0
 
-        self.window_w = width / 2
-        self.window_h = height / 2
+        self.window_w = width * .5
+        self.window_h = height * .5
         self.padding = self.window_w * .05
         self.red = (255, 0, 16)
         self.black = (0, 0, 0)
@@ -46,7 +46,7 @@ class Boss(pygame.sprite.Sprite):
         self.anim_tick = 0
         self.miniature = pygame.image.load('data/assets/sprites/enemy/boss_miniature.png')
         self.miniature_pos = list(self.ramka.topleft)
-        self.miniature_pos[0] -= self.miniature.get_width() / 2
+        self.miniature_pos[0] -= self.miniature.get_width() * .5
 
         self.rotate_delay = 2500
 

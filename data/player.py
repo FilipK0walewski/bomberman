@@ -41,8 +41,8 @@ class Player(pygame.sprite.Sprite):
 
         # health bar
 
-        window_w = window[0] / 2
-        window_h = window[1] / 2
+        window_w = window[0] * .5
+        window_h = window[1] * .5
 
         self.font_size = int(window_h * .05)
 

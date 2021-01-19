@@ -68,7 +68,7 @@ class Game:
         self.go_to_fps = 60
         self.delta_time = 0
 
-        self.display = pygame.Surface((int(self.window_width / 2), int(self.window_height / 2)))
+        self.display = pygame.Surface((int(self.window_width * .5), int(self.window_height * .5)))
         self.menu_display = pygame.Surface((int(self.window_width), int(self.window_height)))
 
         pygame.display.set_caption('Bomberman Simulator 2D RPG')
@@ -120,6 +120,9 @@ class Game:
 
         self.current_level = 0
         self.levels = []
+        self.colliders = []
+        self.hard_wall = []
+        self.soft_wall = []
 
         for i in range(self.number_of_levels):
             path = 'data/assets/maps/level_' + str(i) + '.csv'
@@ -127,6 +130,9 @@ class Game:
             self.levels.append(level)
 
         self.new_level_1 = TileMap('data/assets/maps/new_level_1.csv', self.map_sheet, 1)
+        self.colliders = self.levels[0].get_colliders()
+        self.hard_wall = self.levels[0].get_hard_wall()
+        self.soft_wall = self.levels[0].get_soft_wall()
 
         # menus
         self.main_menu = MainMenu(self)
@@ -188,6 +194,7 @@ class Game:
         # equipment
         self.backpack = Equipment((self.window_width, self.window_height), self.font_name, self.player_0)
         self.loot = []
+        self.loot_type = ['bomb', 'lesser_health_potion', 'coin']
         self.chests = []
         self.spawn_loot()
 
@@ -195,7 +202,7 @@ class Game:
 
         self.chests.append(Chest((360, 64), 0, self.player_0, (self.window_width, self.window_height)))
 
-        pos = (self.levels[4].map_w / 2, self.levels[4].map_h / 2)
+        pos = (self.levels[4].map_w * .5, self.levels[4].map_h * .5)
         self.loot.append(Loot(pos, 4, 'message', 'password to terminal: PASSWORD14'))
         self.loot.append(Loot((128, -128), 6, 'message', 'more soon, quit the game'))
 
@@ -215,7 +222,7 @@ class Game:
             self.draw_game()
 
             # fps on screen
-            self.draw_text(str(round(self.clock.get_fps(), 2)), 16, (0, self.window_height / 2), self.mustard, 'game', 'bottomleft')
+            self.draw_text(str(round(self.clock.get_fps(), 2)), 16, (0, self.window_height * .5), self.mustard, 'game', 'bottomleft')
             self.window.blit(pygame.transform.scale(self.display, (self.window_width, self.window_height)), (0, 0))
             pygame.display.flip()
 
@@ -224,10 +231,11 @@ class Game:
 
     def update_game(self):
 
-        # map
+        # time
 
-        level = self.levels[self.current_level]
-        map_rect = level.get_colliders()
+        current_tick = pygame.time.get_ticks()
+
+        # map
 
         if self.boss is not None:
             self.cut_scene_menager.start_cut_scene(BossSmallTalk(self.player_0, self.boss))
@@ -266,23 +274,19 @@ class Game:
         if self.cut_scene_menager.cut_scene is not None:
             self.cut_scene_menager.update(self.delta_time, self.shoot)
 
-        if len(level.fog) != 0:
-            for tile in level.fog:
-                if abs(tile.center[0] - self.player_0.rect.center[0]) < 32:
-                    self.player_0.talk = True
-                else:
-                    self.player_0.talk_pos = [self.player_0.rect.center[0] - self.camera.offset[0], self.player_0.rect.y - self.camera.offset[1] - 16]
-                    self.player_0.talk = False
+        for tile in self.levels[self.current_level].fog:
+            if abs(tile.center[0] - self.player_0.rect.center[0]) < 32:
+                self.player_0.talk = True
+            else:
+                self.player_0.talk_pos = [self.player_0.rect.center[0] - self.camera.offset[0], self.player_0.rect.y - self.camera.offset[1] - 16]
+                self.player_0.talk = False
 
-        terminals = self.levels[self.current_level].get_terminal_rect()
+        for terminal in self.levels[self.current_level].get_terminal_rect():
+            temp_rect = pygame.Rect(terminal.x, terminal.y + 32, 32, 32)
 
-        if len(terminals) != 0:
-            for terminal in terminals:
-                temp_rect = pygame.Rect(terminal.x, terminal.y + 32, 32, 32)
-
-                if temp_rect.colliderect(self.player_0.rect) and self.use_key is True:
-                    temp = self.terminal.use
-                    self.terminal.use = not temp
+            if temp_rect.colliderect(self.player_0.rect) and self.use_key is True:
+                temp = self.terminal.use
+                self.terminal.use = not temp
 
         if self.terminal.use is True:
             self.player_0.busy = True
@@ -291,12 +295,11 @@ class Game:
 
         if len(self.loot) != 0:
             for item in self.loot:
-                if item.rect.colliderect(self.player_0.rect):
-                    if self.use_key is True:
-                        if self.backpack.empty_slots_number() != 0:
-                            self.backpack.add_item(item)
-                            self.loot.remove(item)
-                            break
+                if self.player_0.rect.collidepoint(item.rect.center):
+                    if self.backpack.empty_slots_number() != 0:
+                        self.backpack.add_item(item)
+                        self.loot.remove(item)
+                        break
 
         # chests
 
@@ -314,15 +317,14 @@ class Game:
         self.camera.scroll()
 
         # missiles
-        tick = pygame.time.get_ticks()
-        if self.shoot is True and tick - 500 > self.player_0.shoot_delay:
+        if self.shoot is True and current_tick - 500 > self.player_0.shoot_delay:
 
             direction = self.player_0.direction
             missile = PlayerMissile(self.player_0.rect.topright, direction)
             self.missiles.append(missile)
 
         for missile in self.missiles:
-            for tile in map_rect:
+            for tile in self.colliders:
                 if missile.rect.colliderect(tile):
                     self.missiles.remove(missile)
                     break
@@ -348,7 +350,7 @@ class Game:
                 self.player_0.img_color = self.magenta
                 self.enemy_missiles.remove(missile)
 
-            for tile in map_rect:
+            for tile in self.colliders:
                 if missile.rect.colliderect(tile):
                     self.enemy_missiles.remove(missile)
                     break
@@ -358,12 +360,10 @@ class Game:
         # bomb
         if self.bomb_dropped is True:
             bomb_info = []
-            current_tick = pygame.time.get_ticks()
 
-            bomb = Bomb(self.player_0.rect, self.levels[self.current_level].get_hard_wall(),
-                        self.levels[self.current_level].get_soft_wall(), self.explosion_length)
+            bomb = Bomb(self.player_0.rect, self.hard_wall, self.soft_wall, self.explosion_length)
             self.bomb_rect.append(bomb.bomb_rect)
-            bomb.move_bomb(map_rect)
+            bomb.move_bomb(self.colliders)
 
             bomb_info.append(bomb)
             bomb_info.append(current_tick)
@@ -378,7 +378,7 @@ class Game:
                     enemy.on_bomb = True
 
         if len(self.bombs) != 0:
-            if self.bomb_pause is True and pygame.time.get_ticks() - self.bombs[-1][1] > 100:
+            if self.bomb_pause is True and current_tick - self.bombs[-1][1] > 100:
                 self.bomb_pause = False
         else:
             self.bomb_pause = False
@@ -395,16 +395,17 @@ class Game:
             for missile in self.missiles:
                 if bomb not in self.old_bombs:
                     if missile.rect.colliderect(bomb[0].bomb_rect):
-                        temp = pygame.time.get_ticks() - bomb[1]
+                        temp = current_tick - bomb[1]
                         temp = 3000 - temp
                         bomb[1] -= temp
                         self.old_bombs.append(bomb)
                         self.missiles.remove(missile)
                         break
+
             for missile in self.enemy_missiles:
                 if bomb not in self.old_bombs:
                     if missile.rect.colliderect(bomb[0].bomb_rect):
-                        temp = pygame.time.get_ticks() - bomb[1]
+                        temp = current_tick - bomb[1]
                         temp = 3000 - temp
                         bomb[1] -= temp
                         self.old_bombs.append(bomb)
@@ -412,22 +413,29 @@ class Game:
                         break
             if bomb not in self.old_bombs and self.boss is not None:
                 if self.boss.rect.colliderect(bomb[0].bomb_rect):
-                    temp = pygame.time.get_ticks() - bomb[1]
+                    temp = current_tick - bomb[1]
                     temp = 3000 - temp
                     bomb[1] -= temp
                     self.old_bombs.append(bomb)
 
         # removing bombs
-        tick = pygame.time.get_ticks()
+
         help_variable = 0
         for bomb in self.bombs:
-            if tick - bomb[1] >= 3000:
+            if current_tick - bomb[1] >= 3000:
 
                 self.bombs[help_variable][0].explosion()
                 self.bombs[help_variable][0].find_edges()
 
                 explosion_rect = self.bombs[help_variable][0].explosion_rect
-                new_turns = self.levels[self.current_level].wall_destroying(explosion_rect)
+                new_turns, destroyed_chests = self.levels[self.current_level].wall_destroying(explosion_rect)
+
+                if len(destroyed_chests) != 0:
+                    self.colliders = self.levels[self.current_level].get_colliders()
+                    self.soft_wall = self.levels[self.current_level].get_soft_wall()
+
+                    for chest in destroyed_chests:
+                        self.drop_loot(chest.topleft)
 
                 for rect in new_turns:
                     self.turn_rect.append(rect)
@@ -443,7 +451,7 @@ class Game:
                         self.player_0.take_damage(20)
                         self.player_0.img_color = self.magenta
                     if self.boss is not None:
-                        if self.boss.rect.collidepoint(tile.center) and pygame.time.get_ticks() - 1000 > self.boss.damage_tick:
+                        if self.boss.rect.collidepoint(tile.center) and current_tick - 1000 > self.boss.damage_tick:
                             self.boss.take_damage(20)
                             self.boss.img_color = self.magenta
                             if self.boss.max_health > self.boss.current_health * 2:
@@ -452,7 +460,7 @@ class Game:
                     for inner_bomb in self.bombs:
                         if inner_bomb != bomb and inner_bomb not in self.old_bombs:
                             if tile.colliderect(inner_bomb[0].bomb_rect):
-                                temp = pygame.time.get_ticks() - inner_bomb[1]
+                                temp = current_tick - inner_bomb[1]
                                 temp = 3000 - temp
                                 inner_bomb[1] -= temp
                                 self.old_bombs.append(bomb)
@@ -461,7 +469,7 @@ class Game:
                     pass
                     # self.bombs[0][1] = self.old_bombs[-1][1]
 
-                if pygame.time.get_ticks() - bomb[1] >= 3490:
+                if current_tick - bomb[1] >= 3490 or bomb[0].to_remove is True:
                     self.bombs.pop(help_variable)
                     self.bomb_rect.pop(help_variable)
             help_variable += 1
@@ -478,16 +486,17 @@ class Game:
                     pass
                 else:
                     enemy.on_bomb = False
-                if abs(enemy.rect.x - self.player_0.rect.x) <= self.window_width / 4 + 50:
-                    if abs(enemy.rect.y - self.player_0.rect.y) <= self.window_height / 4 + 50:
-                        enemy.update(map_rect, self.bomb_rect, self.turn_rect, self.player_0.rect.center, self.delta_time)
+                if abs(enemy.rect.x - self.player_0.rect.x) <= self.window_width * .25 + 50:
+                    if abs(enemy.rect.y - self.player_0.rect.y) <= self.window_height * .25 + 50:
+                        enemy.update(self.colliders, self.bomb_rect, self.turn_rect, self.player_0.rect.center, self.delta_time)
             if enemy.rect.colliderect(self.player_0.rect):
                 self.player_0.take_damage(20)
                 self.player_0.img_color = self.magenta
             if enemy.to_remove is True:
                 self.player_0.gain_xp(10)
+                self.drop_loot(enemy.rect.topleft)
                 self.enemies.remove(enemy)
-            if enemy.rect.x < 0 or enemy.rect.y < 0 or enemy.rect.x > level.get_level_size()[0] or enemy.rect.y > level.get_level_size()[1]:
+            if enemy.rect.x < 0 or enemy.rect.y < 0 or enemy.rect.x > self.levels[self.current_level].get_level_size()[0] or enemy.rect.y > self.levels[self.current_level].get_level_size()[1]:
                 enemy.take_damage(100000)
 
         # door
@@ -520,17 +529,10 @@ class Game:
                                 break
                         break
 
-        # coins
-        coins = self.levels[self.current_level].coin
-        for coin in coins:
-            if self.player_0.rect.colliderect(coin.rect):
-                self.backpack.coins += 1
-                self.player_0.coins += 1
-                self.levels[self.current_level].picking(coin.rect, 'coin')
-
         # cheats
         if self.kill_all_enemies is True:
-            self.enemies.clear()
+            pass
+            # self.enemies.clear()
 
         # boss
 
@@ -562,6 +564,7 @@ class Game:
         # terminal
 
         if self.terminal.use is True:
+            print('terminal use')
             self.terminal.update_terminal()
             if self.terminal.fans is True:
                 self.levels[1] = self.new_level_1
@@ -569,9 +572,9 @@ class Game:
         ################################################################################################################
         # player update
         if self.player_0.on_bomb is True:
-            self.player_0.update(map_rect, self.delta_time, self.cut_scene_menager)
+            self.player_0.update(self.colliders, self.delta_time, self.cut_scene_menager)
         else:
-            temp = map_rect.copy()
+            temp = self.colliders.copy()
             for bomb in self.bomb_rect:
                 temp.append(bomb)
             self.player_0.update(temp, self.delta_time, self.cut_scene_menager)
@@ -607,8 +610,8 @@ class Game:
                 bomb[0].draw_explosion(self.camera.offset, self.display)
 
         for enemy in self.enemies:
-            if abs(enemy.rect.x - self.player_0.rect.x) <= self.window_width / 4 + 100:
-                if abs(enemy.rect.y - self.player_0.rect.y) <= self.window_height / 4 + 100:
+            if abs(enemy.rect.x - self.player_0.rect.x) <= self.window_width * .25 + 100:
+                if abs(enemy.rect.y - self.player_0.rect.y) <= self.window_height * .25 + 100:
                     enemy.draw_enemy(self.camera.offset, self.display)
 
         for missile in self.missiles:
@@ -641,6 +644,12 @@ class Game:
         if self.cut_scene_menager.cut_scene is not None:
             self.cut_scene_menager.draw()
 
+    def drop_loot(self, pos):
+        if random.randint(0, 100) % 5 == 0:
+            item = random.choice(self.loot_type)
+            loot = Loot(pos, self.current_level, item, 'found in dungeon')
+            self.loot.append(loot)
+
     def enter_the_door_function(self, spawn):
 
         for rect in self.levels[self.current_level].get_door_rect():
@@ -659,7 +668,15 @@ class Game:
         self.turn_rect.clear()
         self.turn_rect = self.levels[self.current_level].get_turn_rect()
 
-        n = len(self.levels[self.current_level].floor) / 20
+        self.colliders.clear()
+        self.colliders = self.levels[self.current_level].get_colliders()
+
+        self.hard_wall.clear()
+        self.soft_wall.clear()
+        self.hard_wall = self.levels[self.current_level].get_hard_wall()
+        self.soft_wall = self.levels[self.current_level].get_soft_wall()
+
+        n = len(self.levels[self.current_level].floor) * .05
         if self.levels[self.current_level].map_completed is False and self.levels[self.current_level].without_enemies is False:
             for n in range(int(n)):
                 enemy = Enemy(self.levels[self.current_level].get_spawn_rect(), self.bug_animation, self.death_animation)
@@ -669,7 +686,7 @@ class Game:
                               'mutant')
                 self.enemies.append(enemy)
 
-    def game_over(self, reset=False):
+    def game_over(self):
 
         self.player_0 = Player((self.window_width, self.window_height))
         self.current_level = 0
@@ -679,6 +696,14 @@ class Game:
             level = TileMap(path, self.map_sheet, i)
             self.levels.append(level)
         self.new_level_1 = TileMap('data/assets/maps/new_level_1.csv', self.map_sheet, 1)
+
+        self.colliders.clear()
+        self.colliders = self.levels[0].get_colliders()
+
+        self.hard_wall.clear()
+        self.soft_wall.clear()
+        self.hard_wall = self.levels[0].get_hard_wall()
+        self.soft_wall = self.levels[0].get_soft_wall()
 
         self.bomb_dropped = False
         self.bomb_pause = True

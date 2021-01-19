@@ -7,10 +7,10 @@ import json
 class Menu:
     def __init__(self, game):
         self.game = game
-        self.mid_w = self.game.window_width / 2
-        self.mid_h = self.game.window_height / 2
-        self.title_size = int(self.mid_w / 4)
-        self.font_size = int(self.mid_w / 16)
+        self.mid_w = self.game.window_width * .5
+        self.mid_h = self.game.window_height * .5
+        self.title_size = int(self.mid_w * .25)
+        self.font_size = int(self.mid_w * .0625)
 
         self.run_display = True
         self.run_animation = True
@@ -28,10 +28,10 @@ class Menu:
         self.clock = pygame.time.Clock()
 
     def refresh_root(self):
-        self.mid_w = self.game.window_width / 2
-        self.mid_h = self.game.window_height / 2
-        self.title_size = int(self.mid_w / 4)
-        self.font_size = int(self.mid_w / 16)
+        self.mid_w = self.game.window_width * .5
+        self.mid_h = self.game.window_height * .5
+        self.title_size = int(self.mid_w * .25)
+        self.font_size = int(self.mid_w * .0625)
 
     def screen_blit(self):
         self.game.window.blit(self.game.menu_display, (0, 0))
@@ -101,7 +101,7 @@ class GenerateMessage(Menu):
                 if self.loading_rect.width < self.border_0.width:
                     self.loading_rect.width += 10
                 else:
-                    self.game.draw_text('PRESS SPACE', int(self.font_size / 2), self.border_0.center, self.game.white)
+                    self.game.draw_text('PRESS SPACE', int(self.font_size * .5), self.border_0.center, self.game.white)
 
             else:
                 self.game.draw_text('GAME OVER', self.font_size, (self.level_x, self.level_y), self.game.mustard)
@@ -465,7 +465,7 @@ class VideosMenu(Menu):
                 self.game.full_screen = self.full_screen
 
                 self.game.menu_display = pygame.Surface(resolution)
-                self.game.display = pygame.Surface((int(resolution[0] / 2), int(resolution[1] / 2)))
+                self.game.display = pygame.Surface((int(resolution[0] * .5), int(resolution[1] * .5)))
                 self.game.window_width = resolution[0]
                 self.game.window_height = resolution[1]
 
@@ -608,7 +608,7 @@ class VolumeMenu(Menu):
         if apply_rect.collidepoint(self.mx, self.my):
             self.apply_color = self.game.white
             if self.game.click is True:
-                pass
+                pygame.mixer.music.set_volume(self.current_music * .01)
         else:
             self.apply_color = self.game.mustard
 
@@ -646,7 +646,7 @@ class ControlsMenu(Menu):
         self.back_color, self.apply_color = self.game.mustard, self.game.mustard
 
     def refresh(self):
-        self.mid_w, self.mid_h = self.game.window_width / 2, self.game.window_height / 2
+        self.mid_w, self.mid_h = self.game.window_width * .5, self.game.window_height * .5
 
         self.move_right_x, self.move_right_y = self.mid_w * .1, self.mid_h * .1
         self.move_left_x, self.move_left_y = self.mid_w * .1, self.mid_h * .25
@@ -747,7 +747,7 @@ class CreditsMenu(Menu):
 
     def refresh(self):
 
-        self.mid_w, self.mid_h = self.game.window_width / 2, self.game.window_height / 2
+        self.mid_w, self.mid_h = self.game.window_width * .5, self.game.window_height * .5
         self.back_x, self.back_y = self.mid_w, self.mid_h * 1.75
         self.created_by_y = self.mid_h * .5
 

@@ -34,10 +34,8 @@ class TileMap:
         self.chest = []
         self.wall = pygame.sprite.Group()
         self.door = []
-        self.coin = []
         self.terminals = []
         self.other = []
-
         self.just_floor = []
 
         self.map_h, self.map_w = 0, 0
@@ -93,75 +91,65 @@ class TileMap:
     def wall_destroying(self, explosion_rect):
 
         r = []
-        i = 0
         turns = []
+        chests = []
 
         for tile in explosion_rect:
             for chest in self.chest:
                 if chest.rect.collidepoint(tile.center):
-                    i += 1
+                    chests.append(chest.rect)
                     r.append(chest.rect)
                     self.just_floor.append(chest.rect)
                     self.chest.remove(chest)
 
-                    # coin
-                    if random.randint(1, 2) == 1:
-                        self.coin.append(Tile('coin', chest.rect.x, chest.rect.y, self.spritesheet))
+        if len(chests) != 0:
+            new_r = []
+            for rect in r:
+                temp_tile_l = rect.copy()
+                temp_tile_r = rect.copy()
+                temp_tile_u = rect.copy()
+                temp_tile_d = rect.copy()
+                temp_tile_l.x -= 32
+                temp_tile_r.x += 32
+                temp_tile_u.y -= 32
+                temp_tile_d.y += 32
+                if temp_tile_l in self.just_floor:
+                    new_r.append(temp_tile_l)
+                if temp_tile_r in self.just_floor:
+                    new_r.append(temp_tile_r)
+                if temp_tile_u in self.just_floor:
+                    new_r.append(temp_tile_u)
+                if temp_tile_d in self.just_floor:
+                    new_r.append(temp_tile_d)
+                new_r.append(rect)
 
-        new_r = []
-        for rect in r:
-            temp_tile_l = rect.copy()
-            temp_tile_r = rect.copy()
-            temp_tile_u = rect.copy()
-            temp_tile_d = rect.copy()
-            temp_tile_l.x -= 32
-            temp_tile_r.x += 32
-            temp_tile_u.y -= 32
-            temp_tile_d.y += 32
-            if temp_tile_l in self.just_floor:
-                new_r.append(temp_tile_l)
-            if temp_tile_r in self.just_floor:
-                new_r.append(temp_tile_r)
-            if temp_tile_u in self.just_floor:
-                new_r.append(temp_tile_u)
-            if temp_tile_d in self.just_floor:
-                new_r.append(temp_tile_d)
-            new_r.append(rect)
+            for tile in new_r:
+                temp_tile_l = tile.copy()
+                temp_tile_r = tile.copy()
+                temp_tile_u = tile.copy()
+                temp_tile_d = tile.copy()
+                temp_tile_l.x -= 32
+                temp_tile_r.x += 32
+                temp_tile_u.y -= 32
+                temp_tile_d.y += 32
 
-        for tile in new_r:
-            temp_tile_l = tile.copy()
-            temp_tile_r = tile.copy()
-            temp_tile_u = tile.copy()
-            temp_tile_d = tile.copy()
-            temp_tile_l.x -= 32
-            temp_tile_r.x += 32
-            temp_tile_u.y -= 32
-            temp_tile_d.y += 32
+                temp_int = 0
 
-            temp_int = 0
+                if temp_tile_r in self.just_floor:
+                    temp_int += 1
+                if temp_tile_l in self.just_floor:
+                    temp_int += 1
+                if temp_tile_u in self.just_floor:
+                    temp_int += 1
+                if temp_tile_d in self.just_floor:
+                    temp_int += 1
 
-            if temp_tile_r in self.just_floor:
-                temp_int += 1
-            if temp_tile_l in self.just_floor:
-                temp_int += 1
-            if temp_tile_u in self.just_floor:
-                temp_int += 1
-            if temp_tile_d in self.just_floor:
-                temp_int += 1
+                if temp_int >= 3:
+                    turns.append(tile)
 
-            if temp_int >= 3:
-                turns.append(tile)
-
-        if i != 0:
             self.load_map()
-        return turns
 
-    def picking(self, rect, type):
-        if type == 'coin':
-            for coin in self.coin:
-                if coin.rect == rect:
-                    self.coin.remove(coin)
-        self.load_map()
+        return turns, chests
 
     def get_door_rect(self):
         r = []
@@ -214,8 +202,6 @@ class TileMap:
 
     def load_map(self):
         self.floor.draw(self.map_surface)
-        for tile in self.coin:
-            tile.draw(self.map_surface)
         for tile in self.chest:
             tile.draw(self.map_surface)
         for tile in self.door:

@@ -7,8 +7,8 @@ class Terminal:
         self.locked = True
         self.python = False
 
-        self.screen_w = w / 2
-        self.screen_h = h / 2
+        self.screen_w = w * .5
+        self.screen_h = h * .5
         padding = 40
         self.border_size = 20
         self.screen = pygame.Rect(padding, padding, self.screen_w - 2 * padding, self.screen_h - 2 * padding)
