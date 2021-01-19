@@ -320,7 +320,9 @@ class Game:
         if self.shoot is True and current_tick - 500 > self.player_0.shoot_delay:
 
             direction = self.player_0.direction
-            missile = PlayerMissile(self.player_0.rect.topright, direction)
+            pos = (self.player_0.rect.top, self.player_0.rect.center[1])
+
+            missile = PlayerMissile(self.player_0.rect.center, direction)
             self.missiles.append(missile)
 
         for missile in self.missiles:

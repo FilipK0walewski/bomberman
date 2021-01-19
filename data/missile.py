@@ -4,10 +4,11 @@ import math
 
 class PlayerMissile:
     def __init__(self, pos, direction):
-        self.rect = pygame.Rect(pos[0], pos[1], 8, 8)
+        self.img = pygame.image.load('data/assets/sprites/missile.png')
+        self.rect = self.img.get_rect()
+        self.rect.center = pos
         self.direction = direction
 
-        self.img = pygame.image.load('data/assets/sprites/missile.png')
         self.speed = .8
         self.friction = -.01
         self.max_velocity = 5
@@ -38,7 +39,7 @@ class PlayerMissile:
         self.friction -= .002
 
         self.position += self.velocity * dt + (self.acceleration * .5) * (dt * dt)
-        self.rect.x, self.rect.y = self.position
+        self.rect.center = self.position
 
     def draw(self, s, display):
         display.blit(self.img, (self.rect.x - s[0], self.rect.y - s[1]))
